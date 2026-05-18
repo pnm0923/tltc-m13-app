@@ -78,11 +78,15 @@ with st.sidebar:
 
 # --- PANTALLA PRINCIPAL (HOME) ---
 if st.session_state.pantalla_actual == "Inicio":
-    # Imagen del Escudo
+    # Imagen del Escudo Local
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        # Cargamos el escudo directamente desde el enlace del club que compartiste
-        st.image("https://upload.wikimedia.org/wikipedia/commons/e/e2/Logo_del_Tucum%C3%A1n_Lawn_Tennis_Club.png", use_container_width=True)
+        try:
+            # Busca la imagen directamente en la carpeta de tu repositorio
+            st.image("escudo.png", use_container_width=True)
+        except:
+            # Si por alguna razón no se subió bien, muestra un texto para que no rompa la app
+            st.markdown("<h3 style='text-align:center;'>🟨 TLTC M-13 🟦</h3>", unsafe_allow_html=True)
     
     st.title("TLTC M-13")
     st.write("Panel de Control del Entrenador")
