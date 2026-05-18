@@ -2,17 +2,33 @@ import streamlit as st
 import datetime
 import pandas as pd
 
-# CONFIGURACIÓN DE LA PÁGINA (Colores y Estilo TLTC)
+# CONFIGURACIÓN DE LA PÁGINA (Estilo TLTC)
 st.set_page_config(page_title="TLTC M-13", page_icon="🏉", layout="centered")
 
-# Inyección de CSS para forzar la paleta Azul y Oro sobre fondo oscuro
+# Inyección de CSS para diseño responsivo en tu Xiaomi
 st.markdown("""
     <style>
     .stApp { backgroundColor: #1E1E1E; color: white; }
-    h1, h2, h3 { color: #F4C430 !important; font-family: 'Arial Black', sans-serif; }
+    h1, h2, h3 { color: #F4C430 !important; font-family: 'Arial', sans-serif; text-align: center; }
+    
+    /* Botones grandes de la pantalla principal */
+    .menu-card {
+        background-color: #2B3E75;
+        border: 2px solid #F4C430;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 15px;
+        cursor: pointer;
+    }
+    .menu-card h4 { margin: 0; color: white !important; font-size: 18px; }
+    .menu-card p { margin: 5px 0 0 0; color: #CCCCCC; font-size: 13px; }
+    
+    /* Botones del sistema de Streamlit */
     .stButton>button { 
         background-color: #2B3E75 !important; color: white !important; 
         border: 2px solid #F4C430 !important; border-radius: 10px; width: 100%;
+        font-weight: bold;
     }
     .stButton>button:hover { background-color: #F4C430 !important; color: #2B3E75 !important; }
     div[data-testid="stExpander"] { background-color: #2A2A2A !important; border-radius: 8px; }
@@ -35,8 +51,6 @@ if 'plantel' not in st.session_state:
         "SILVA SANTIAGO", "SOLBES FACUNDO", "SOSA LORENZO", "SOUBIE PEDRO", "TOMÁS FELIPE", "VALLE PADUA FELIPE",
         "VELAZQUEZ FELIPE", "VIOLETTO OCTAVIO", "VIOTTI JUAN MARTIN"
     ]
-    
-    # Estructuramos el plantel en un diccionario dinámico
     st.session_state.plantel = {
         str(i+1): {
             "apellido": nombre.split()[0],
@@ -51,24 +65,64 @@ if 'plantel' not in st.session_state:
 if 'asistencias' not in st.session_state:
     st.session_state.asistencias = {}
 
-# 3. INTERFAZ PRINCIPAL
-st.title("🏉 TLTC M-13")
-st.subheader("Panel de Control del Entrenador")
+# Gestión de pantallas mediante Estado de Sesión
+if 'pantalla_actual' not in st.session_state:
+    st.session_state.pantalla_actual = "Inicio"
 
-menu = st.sidebar.radio("Navegación", ["Asistencia Entrenamiento", "Plantel Actual", "Estadísticas Rápidas"])
+# Menú de control oculto o complementario en el lateral
+with st.sidebar:
+    st.markdown("### Menú de Navegación")
+    if st.button("🏠 Volver al Inicio"):
+        st.session_state.pantalla_actual = "Inicio"
+        st.rerun()
+
+# --- PANTALLA PRINCIPAL (HOME) ---
+if st.session_state.pantalla_actual == "Inicio":
+    # Imagen del Escudo
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        # Cargamos el escudo directamente desde el enlace del club que compartiste
+        st.image("https://upload.wikimedia.org/wikipedia/commons/e/e2/Logo_del_Tucum%C3%A1n_Lawn_Tennis_Club.png", use_container_width=True)
+    
+    st.title("TLTC M-13")
+    st.write("Panel de Control del Entrenador")
+    st.write("---")
+    
+    # Grid de opciones interactivas para simular los botones del diseño original
+    col_a, col_b = st.columns(2)
+    
+    with col_a:
+        st.markdown('<div class="menu-card"><h4>👥 Plantel Actual</h4><p>Lista, datos y fotos de perfil</p></div>', unsafe_allow_html=True)
+        if st.button("Ir a Plantel", key="btn_plantel"):
+            st.session_state.pantalla_actual = "Plantel"
+            st.rerun()
+            
+        st.markdown('<div class="menu-card"><h4>📋 Asistencia Entr.</h4><p>Cargar fecha y presentes</p></div>', unsafe_allow_html=True)
+        if st.button("Ir a Asistencia", key="btn_asistencia"):
+            st.session_state.pantalla_actual = "Asistencia"
+            st.rerun()
+
+    with col_b:
+        st.markdown('<div class="menu-card"><h4>🏉 Partidos</h4><p>Selección y minutos jugados</p></div>', unsafe_allow_html=True)
+        if st.button("Ir a Partidos", key="btn_partidos"):
+            st.session_state.pantalla_actual = "Partidos"
+            st.rerun()
+            
+        st.markdown('<div class="menu-card"><h4>📊 Estadísticas</h4><p>Ver evolución del jugador</p></div>', unsafe_allow_html=True)
+        if st.button("Ir a Estadísticas", key="btn_stats"):
+            st.session_state.pantalla_actual = "Estadísticas"
+            st.rerun()
 
 # --- MÓDULO 1: ASISTENCIA A ENTRENAMIENTO ---
-if menu == "Asistencia Entrenamiento":
-    st.header("📋 Registro de Asistencia")
+elif st.session_state.pantalla_actual == "Asistencia":
+    st.header("📋 Asistencia a Entrenamiento")
     
     fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today())
     fecha_str = fecha.strftime("%Y-%m-%d")
     
-    # Inicializar fecha si no existe
     if fecha_str not in st.session_state.asistencias:
         st.session_state.asistencias[fecha_str] = {id_: False for id_ in st.session_state.plantel.keys()}
     
-    # Acciones en masa para el Xiaomi
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("✔️ Todos Presentes"):
@@ -77,31 +131,26 @@ if menu == "Asistencia Entrenamiento":
         if st.button("❌ Reiniciar Lista"):
             st.session_state.asistencias[fecha_str] = {id_: False for id_ in st.session_state.plantel.keys()}
             
-    # Buscador rápido
     buscar = st.text_input("🔍 Buscar jugador para asistencia...")
-    
     st.write("---")
-    presentes_cont = 0
     
-    # Listado con Checkboxes
+    presentes_cont = 0
     for id_, datos in st.session_state.plantel.items():
         nombre_completo = f"{datos['apellido']} {datos['nombre']}"
         if buscar.lower() in nombre_completo.lower():
-            # Checkbox interactivo
             estado_actual = st.session_state.asistencias[fecha_str].get(id_, False)
             check = st.checkbox(nombre_completo, value=estado_actual, key=f"asist_{id_}_{fecha_str}")
             st.session_state.asistencias[fecha_str][id_] = check
             if check:
                 presentes_cont += 1
                 
-    st.sidebar.metric("Chicos en Cancha", f"{presentes_cont} / 55")
+    st.write(f"**Presentes en cancha:** {presentes_cont} / 55")
     if st.button("💾 GUARDAR ENTRENAMIENTO"):
         st.success(f"¡Asistencia del {fecha_str} guardada con éxito!")
 
 # --- MÓDULO 2: PLANTEL ACTUAL Y FICHAS ---
-elif menu == "Plantel Actual":
+elif st.session_state.pantalla_actual == "Plantel":
     st.header("👥 Plantel Completo M-13")
-    
     buscar_p = st.text_input("🔍 Buscar en el plantel...")
     
     for id_, datos in st.session_state.plantel.items():
@@ -109,32 +158,24 @@ elif menu == "Plantel Actual":
         if buscar_p.lower() in nombre_completo.lower():
             with st.expander(f"🏃‍♂️ {nombre_completo}"):
                 st.write(f"**Categoría:** 2013 (M-13)")
-                
-                # Carga de Foto de Perfil usando la cámara del Xiaomi
-                foto_archivo = st.file_uploader(f"Foto de Perfil ({datos['apellido']})", type=["jpg", "png", "jpeg"], key=f"foto_{id_}")
+                foto_archivo = st.file_uploader(f"Foto de Perfil", type=["jpg", "png", "jpeg"], key=f"foto_{id_}")
                 if foto_archivo:
                     st.session_state.plantel[id_]["foto"] = foto_archivo
                     st.image(foto_archivo, width=120)
-                elif datos["foto"]:
-                    st.image(datos["foto"], width=120)
-                
-                # Edición de Notas de Coaching en vivo
-                st.session_state.plantel[id_]["notas_actitud"] = st.text_area("🌟 Notas Actitudinales / Valores:", datos["notas_actitud"], key=f"act_{id_}")
+                st.session_state.plantel[id_]["notas_actitud"] = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
                 st.session_state.plantel[id_]["notas_tecnicas"] = st.text_area("🏉 Notas Técnicas (Pases/Tackles):", datos["notas_tecnicas"], key=f"tec_{id_}")
 
-# --- MÓDULO 3: ESTADÍSTICAS RÁPIDAS ---
-elif menu == "Estadísticas Rápidas":
-    st.header("📊 Resumen de Rendimiento")
-    st.write("Evolución del porcentaje de asistencia del plantel.")
-    
+# --- MÓDULO 3: PROXIMAMENTE PARTIDOS ---
+elif st.session_state.pantalla_actual == "Partidos":
+    st.header("🏉 Carga de Partidos y Minutos")
+    st.info("Módulo en desarrollo. Próximamente podrás cargar el rival de la fecha (Universitario, Huirapuca, etc.) y controlar el recambio equitativo de los chicos.")
+
+# --- MÓDULO 4: PROXIMAMENTE ESTADÍSTICAS ---
+elif st.session_state.pantalla_actual == "Estadísticas":
+    st.header("📊 Estadísticas de Rendimiento")
     if st.session_state.asistencias:
         fechas = list(st.session_state.asistencias.keys())
-        porcentajes = []
-        for f in fechas:
-            total_ps = sum(st.session_state.asistencias[f].values())
-            porcentajes.append((total_ps / 55) * 180) # Escala visual
-            
         chart_data = pd.DataFrame({"Asistencia Total (%)": [min(100, int((sum(st.session_state.asistencias[f].values())/55)*100)) for f in fechas]}, index=fechas)
         st.line_chart(chart_data)
     else:
-        st.info("Aún no hay datos cargados para generar estadísticas. Registrá asistencia en algún entrenamiento.")
+        st.info("Aún no hay asistencias registradas para graficar.")
