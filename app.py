@@ -171,15 +171,14 @@ elif st.session_state.pantalla_actual == "Asistencia":
     
     if st.button("💾 GUARDAR ENTRENAMIENTO EN LA NUBE", key="btn_guardar_asist"):
         with st.spinner("Sincronizando con Supabase..."):
-            # [ELIMINACIÓN ABSOLUTA DE DELETE] Hacemos un upsert limpio y directo de toda la lista
             filas_asistencia = []
             for id_ in st.session_state.plantel.keys():
                 val_presente = st.session_state.get(f"chk_asist_{id_}_{fecha_str}", False)
                 filas_asistencia.append({"fecha": fecha_str, "jugador_id": str(id_), "presente": val_presente})
             
-            # Se ejecuta de forma nativa por lote sin on_conflict problemáticos
+            # Al tener Clave Primaria Compuesta en la tabla, el upsert funciona de forma nativa directa
             supabase.table("asistencias_entrenamiento").upsert(filas_asistencia).execute()
-            st.success("¡Asistencia guardada permanentemente con éxito!")
+            st.success("¡Asistencia guardada permanentemente en la nube!")
 
 # --- MÓDULO 2: PLANTEL ACTUAL ---
 elif st.session_state.pantalla_actual == "Plantel":
