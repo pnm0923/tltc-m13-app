@@ -154,4 +154,4 @@ elif st.session_state.pantalla_actual == "Asistencia":
     st.write("---")
     
     presentes_cont = 0
-    for id_, datos in st.session_
+    for id_,
