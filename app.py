@@ -1,6 +1,11 @@
 import streamlit as st
 import datetime
 import pandas as pd
+import io
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import matplotlib.patheffects as path_effects
+from unidecode import unidecode
 
 # CONFIGURACIÓN DE LA PÁGINA (Estilo TLTC)
 st.set_page_config(page_title="TLTC M-13", page_icon="🏉", layout="centered")
@@ -24,25 +29,6 @@ st.markdown("""
     .menu-card h4 { margin: 0; color: white !important; font-size: 18px; }
     .menu-card p { margin: 5px 0 0 0; color: #CCCCCC; font-size: 13px; }
     
-    /* Estilo de la Placa Oficial de Matchday */
-    .placa-convocados {
-        background-color: #111111; border: 3px solid #F4C430; border-radius: 15px;
-        padding: 25px; text-align: center; font-family: 'Arial Black', sans-serif;
-        box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
-    }
-    .placa-titulo { color: #F4C430 !important; font-size: 26px; margin-bottom: 2px; text-transform: uppercase; }
-    .placa-sub { color: #FFFFFF !important; font-size: 16px; margin-bottom: 15px; font-weight: bold; }
-    .placa-puesto-header {
-        background-color: #2B3E75; color: #F4C430 !important;
-        padding: 4px 10px; border-radius: 5px; font-size: 14px;
-        text-transform: uppercase; margin-top: 15px; text-align: left;
-        border-left: 5px solid #F4C430;
-    }
-    .placa-jugador {
-        color: #FFFFFF; font-size: 15px; text-align: left;
-        padding-left: 15px; margin: 4px 0; font-family: 'Arial', sans-serif;
-    }
-    
     /* Botones del sistema de Streamlit */
     .stButton>button { 
         background-color: #2B3E75 !important; color: white !important; 
@@ -54,8 +40,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Lista de puestos oficiales solicitados
+# Listas de control global
 LISTA_PUESTOS = ["Sin Puesto", "Pilar", "Hooker", "2° Linea", "3° Linea", "Medio scrum", "Apertura", "Centro", "Wing", "Fullback"]
+ORDEN_PUESTOS = ["Sin Puesto", "Pilar", "Hooker", "2° Linea", "3° Linea", "Medio scrum", "Apertura", "Centro", "Wing", "Fullback"]
 
 # 2. BASE DE DATOS SEMILLA (Los 55 chicos de la M-13)
 if 'plantel' not in st.session_state:
@@ -95,7 +82,7 @@ if 'partidos' not in st.session_state:
 if 'pantalla_actual' not in st.session_state:
     st.session_state.pantalla_actual = "Inicio"
 
-# Menú de control oculto o complementario en el lateral
+# Menú de navegación lateral
 with st.sidebar:
     st.markdown("### Menú de Navegación")
     if st.button("🏠 Volver al Inicio"):
@@ -116,9 +103,7 @@ if st.session_state.pantalla_actual == "Inicio":
     st.write("Panel de Control del Entrenador")
     st.write("---")
     
-    # Grid de opciones interactivas
     col_a, col_b = st.columns(2)
-    
     with col_a:
         st.markdown('<div class="menu-card"><h4>👥 Plantel Actual</h4><p>Lista, puestos y fotos de perfil</p></div>', unsafe_allow_html=True)
         if st.button("Ir a Plantel", key="btn_plantel"):
@@ -129,7 +114,6 @@ if st.session_state.pantalla_actual == "Inicio":
         if st.button("Ir a Asistencia", key="btn_asistencia"):
             st.session_state.pantalla_actual = "Asistencia"
             st.rerun()
-
     with col_b:
         st.markdown('<div class="menu-card"><h4>🏉 Partidos y Placas</h4><p>Selección por Bloques y Placas</p></div>', unsafe_allow_html=True)
         if st.button("Ir a Partidos", key="btn_partidos"):
@@ -219,15 +203,6 @@ elif st.session_state.pantalla_actual == "Plantel":
                 st.session_state.plantel[id_]["notas_actitud"] = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
                 st.session_state.plantel[id_]["notas_tecnicas"] = st.text_area("🏉 Notas Técnicas (Pases/Tackles):", datos["notas_tecnicas"], key=f"tec_{id_}")
 
-import io
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import matplotlib.patheffects as path_effects
-from unidecode import unidecode
-
-# [CORRECCIÓN/MEJORA] Lista de puestos en orden de juego
-ORDEN_PUESTOS = ["Sin Puesto", "Pilar", "Hooker", "2° Linea", "3° Linea", "Medio scrum", "Apertura", "Centro", "Wing", "Fullback"]
-
 # --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS ---
 elif st.session_state.pantalla_actual == "Partidos":
     st.header("🏉 Carga de Partidos y Convocatorias")
@@ -272,16 +247,13 @@ elif st.session_state.pantalla_actual == "Partidos":
         
         convocados_cont = 0
         for id_, datos in st.session_state.plantel.items():
-            # Mostramos el puesto también en la lista de partidos para guiarte
             nombre_completo = f"{datos['apellido']} {datos['nombre']} ({datos['puesto']})"
             
             if buscar_p.lower() in nombre_completo.lower():
                 clave_check_p = f"chk_partido_{id_}_{llave_partido}"
                 estado_guardado_p = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
                 
-                # Sincronización visual estricta
                 st.session_state[clave_check_p] = estado_guardado_p
-                
                 check_p = st.checkbox(nombre_completo, key=clave_check_p)
                 
                 if check_p != st.session_state.partidos[llave_partido]["convocados"][id_]:
@@ -302,48 +274,37 @@ elif st.session_state.pantalla_actual == "Partidos":
         if rival_seleccionado == "Seleccionar rival..." or convocados_cont == 0:
             st.warning("⚠️ Asegurate de tener un rival y al menos un convocado.")
         else:
-            # BOTÓN MÁGICO PARA GENERAR LA IMAGEN DESCARGABLE
             if st.button("🖼️ GENERAR IMAGEN PROFESIONAL"):
                 with st.spinner("Dibujando la placa..."):
-                    # 1. Configuración de Matplotlib para el diseño
                     plt.rcParams['font.family'] = 'sans-serif'
                     plt.rcParams['font.size'] = 12
                     
-                    # Definimos el canvas de la imagen (más alto que ancho, para celu)
                     fig, ax = plt.subplots(figsize=(8, 14), dpi=100)
-                    ax.set_facecolor('#111111') # Fondo negro
+                    ax.set_facecolor('#111111')
                     plt.tight_layout()
                     
-                    # Eliminamos los ejes cartesianos
                     ax.set_xlim(0, 10)
                     ax.set_ylim(0, 20)
                     ax.axis('off')
                     
-                    # 2. Dibujamos la Cabecera (Escudo, Título y Rival)
-                    # Agregamos el escudo (si está en el repositorio)
                     try:
                         escudo_img = plt.imread("escudo.png")
                         ax.imshow(escudo_img, extent=[4, 6, 17.5, 19.5], zorder=1)
                     except:
-                        pass # Si no hay escudo, no dibuja nada
+                        pass
 
-                    # Título Oro
                     y_text = 17.2
                     ax.text(5, y_text, f"CONVOCADOS M-13", color='#F4C430', fontsize=30, fontweight='bold', ha='center')
                     
-                    # Subtítulo (Bloque vs Rival)
                     y_text -= 1.0
                     bloque_texto = 'AZUL' if 'Azul' in bloque_seleccionado else 'AMARILLO'
                     ax.text(5, y_text, f"TLTC {bloque_texto} vs {unidecode(rival_seleccionado).upper()}", color='white', fontsize=18, fontweight='bold', ha='center')
                     
-                    # Fecha
                     y_text -= 0.6
                     ax.text(5, y_text, f"📅 {fecha_p_str}", color='#AAAAAA', fontsize=12, ha='center')
                     
-                    y_text -= 1.0 # Espacio para la lista
+                    y_text -= 1.0
                     
-                    # 3. Dibujamos el Listado de Jugadores agrupado por puestos
-                    # Recorremos los puestos en orden oficial
                     for puesto in ORDEN_PUESTOS:
                         chicos_en_puesto = []
                         for id_jugador, convocado in st.session_state.partidos[llave_partido]["convocados"].items():
@@ -352,36 +313,29 @@ elif st.session_state.pantalla_actual == "Partidos":
                                 if datos_chico["puesto"] == puesto:
                                     chicos_en_puesto.append(f"{unidecode(datos_chico['apellido']).upper()} {unidecode(datos_chico['nombre']).upper()}")
                         
-                        # Si hay chicos en este puesto, dibujamos la sección
                         if chicos_en_puesto:
-                            # Fondo para el header del puesto (Azul)
                             y_text -= 0.6
                             rect = patches.Rectangle((1, y_text - 0.2), 8, 0.6, facecolor='#2B3E75', edgecolor='#F4C430', linewidth=1.5, rx=0.2, ry=0.2, zorder=0)
                             ax.add_patch(rect)
                             
-                            # Texto del Header (Oro)
                             ax.text(1.2, y_text + 0.1, f"{puesto.upper()}", color='#F4C430', fontsize=14, fontweight='bold', ha='left', va='center')
                             
                             y_text -= 0.6
-                            # Texto de los Jugadores (Blanco con efecto sombra para legibilidad)
                             for chico in chicos_en_puesto:
                                 txt = ax.text(1.4, y_text, chico, color='white', fontsize=13, ha='left', va='center')
                                 txt.set_path_effects([path_effects.withStroke(linewidth=2, foreground='#000000')])
-                                y_text -= 0.4 # Espacio para el siguiente chico
+                                y_text -= 0.4
                                 
-                    # 4. Dibujamos el Pie de Placa con la identidad del club
                     y_text = 1.0
                     ax.text(5, y_text, f"“RESPECTO • COMPAÑERISMO • PASIÓN” • TLTC", color='#AAAAAA', fontsize=12, ha='center')
                     ax.text(5, 0.5, "🏉 Matchday Convocatoria 🏉", color='#F4C430', fontsize=10, ha='center')
 
-                    # 5. Guardamos la imagen en memoria (Buffer) para que no ocupe espacio físico
                     buf = io.BytesIO()
                     plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.1)
                     buf.seek(0)
+                    plt.close()
                     
                     st.write("---")
-                    
-                    # 6. Mostramos la imagen final en el celular y activamos la descarga
                     st.image(buf, caption=f"Placa Matchday vs {rival_seleccionado}", use_container_width=True)
                     
                     st.download_button(
