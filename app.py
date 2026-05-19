@@ -91,7 +91,6 @@ with st.sidebar:
 
 # --- PANTALLA PRINCIPAL (HOME) ---
 if st.session_state.pantalla_actual == "Inicio":
-    # Imagen del Escudo Local
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
@@ -221,12 +220,14 @@ elif st.session_state.pantalla_actual == "Partidos":
     
     llave_partido = f"{fecha_p_str}_{'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'}"
     
+    # Inicializar la base de datos interna si no existe
     if llave_partido not in st.session_state.partidos:
         st.session_state.partidos[llave_partido] = {
             "rival": "",
             "bloque": bloque_seleccionado,
             "convocados": {id_: False for id_ in st.session_state.plantel.keys()}
         }
+    
     if rival_seleccionado != "Seleccionar rival...":
         st.session_state.partidos[llave_partido]["rival"] = rival_seleccionado
 
@@ -236,10 +237,14 @@ elif st.session_state.pantalla_actual == "Partidos":
     tab_carga, tab_placa = st.tabs(["📝 Cargar Convocados", "🖼️ Ver Placa de Matchday"])
     
     with tab_carga:
+        # [CORRECCIÓN BLINDADA] Forzamos el sincronismo de la memoria visual de Streamlit con la base de datos
+        for id_ in st.session_state.plantel.keys():
+            clave_check_p = f"chk_partido_{id_}_{llave_partido}"
+            st.session_state[clave_check_p] = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
+
         if st.button("❌ Limpiar Convocatoria de este Bloque", key="btn_limpiar_partido"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.partidos[llave_partido]["convocados"][id_] = False
-                st.session_state[f"chk_partido_{id_}_{llave_partido}"] = False
             st.rerun()
 
         buscar_p = st.text_input("🔍 Buscar jugador para convocar...")
@@ -251,11 +256,19 @@ elif st.session_state.pantalla_actual == "Partidos":
             
             if buscar_p.lower() in nombre_completo.lower():
                 clave_check_p = f"chk_partido_{id_}_{llave_partido}"
-                estado_guardado_p = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
                 
-                st.session_state[clave_check_p] = estado_guardado_p
-                check_p = st.checkbox(nombre_completo, key=clave_check_p)
+                # Control de bloques cruzados sutil
+                otra_llave = f"{fecha_p_str}_{'Amarillo' if 'Azul' in bloque_seleccionado else 'Azul'}"
+                ya_juega_en_otro = False
+                if otra_llave in st.session_state.partidos:
+                    ya_juega_en_otro = st.session_state.partidos[otra_llave]["convocados"].get(id_, False)
                 
+                etiqueta = f"🏃‍♂️ {nombre_completo} ⚠️ (Ya está en el otro Bloque)" if ya_juega_en_otro else nombre_completo
+                
+                # Dibujamos el checkbox controlado estrictamente por la memoria de la sesión
+                check_p = st.checkbox(etiqueta, key=clave_check_p)
+                
+                # Si cambia el tilde del entrenador, actualiza la base de datos de inmediato y redibuja sin perder el foco
                 if check_p != st.session_state.partidos[llave_partido]["convocados"][id_]:
                     st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
                     st.rerun()
@@ -271,8 +284,11 @@ elif st.session_state.pantalla_actual == "Partidos":
                 st.success(f"¡Partido vs. {rival_seleccionado} ({bloque_seleccionado}) guardado correctamente!")
 
     with tab_placa:
-        if rival_seleccionado == "Seleccionar rival..." or convocados_cont == 0:
-            st.warning("⚠️ Asegurate de tener un rival y al menos un convocado.")
+        # Calculamos los chicos tildados en el momento de entrar a la pestaña
+        total_convocados_reales = sum(st.session_state.partidos[llave_partido]["convocados"].values())
+        
+        if rival_seleccionado == "Seleccionar rival..." or total_convocados_reales == 0:
+            st.warning("⚠️ Asegurate de tener un rival seleccionado arriba y al menos un chico tildado en la pestaña anterior.")
         else:
             if st.button("🖼️ GENERAR IMAGEN PROFESIONAL"):
                 with st.spinner("Dibujando la placa..."):
