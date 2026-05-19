@@ -124,33 +124,52 @@ elif st.session_state.pantalla_actual == "Asistencia":
     fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today())
     fecha_str = fecha.strftime("%Y-%m-%d")
     
+    # Inicializar fecha si no existe en la base de datos
     if fecha_str not in st.session_state.asistencias:
         st.session_state.asistencias[fecha_str] = {id_: False for id_ in st.session_state.plantel.keys()}
     
+    # BOTONES DE ACCIÓN MASIVA (Corregidos con rerun inmediato)
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        if st.button("✔️ Todos Presentes"):
-            st.session_state.asistencias[fecha_str] = {id_: True for id_ in st.session_state.plantel.keys()}
+        if st.button("✔️ Todos Presentes", key="btn_todos_pres"):
+            for id_ in st.session_state.plantel.keys():
+                st.session_state.asistencias[fecha_str][id_] = True
+            st.rerun()  # Fuerza a la app a redibujar los checkboxes con el tilde puesto
+            
     with col_btn2:
-        if st.button("❌ Reiniciar Lista"):
-            st.session_state.asistencias[fecha_str] = {id_: False for id_ in st.session_state.plantel.keys()}
+        if st.button("❌ Reiniciar (Todos Ausentes)", key="btn_todos_aus"):
+            for id_ in st.session_state.plantel.keys():
+                st.session_state.asistencias[fecha_str][id_] = False
+            st.rerun()  # Fuerza a la app a destildar todo al instante
             
     buscar = st.text_input("🔍 Buscar jugador para asistencia...")
     st.write("---")
     
     presentes_cont = 0
+    
+    # LISTADO INTERACTIVO
     for id_, datos in st.session_state.plantel.items():
         nombre_completo = f"{datos['apellido']} {datos['nombre']}"
         if buscar.lower() in nombre_completo.lower():
-            estado_actual = st.session_state.asistencias[fecha_str].get(id_, False)
-            check = st.checkbox(nombre_completo, value=estado_actual, key=f"asist_{id_}_{fecha_str}")
-            st.session_state.asistencias[fecha_str][id_] = check
+            # Traemos el estado real guardado en memoria
+            estado_guardado = st.session_state.asistencias[fecha_str].get(id_, False)
+            
+            # Dibujamos el checkbox usando el estado real de la base de datos
+            check = st.checkbox(nombre_completo, value=estado_guardado, key=f"chk_asist_{id_}_{fecha_str}")
+            
+            # Si el usuario lo toca manualmente en el Xiaomi, actualiza la memoria
+            if check != estado_guardado:
+                st.session_state.asistencias[fecha_str][id_] = check
+                st.rerun()
+                
             if check:
                 presentes_cont += 1
                 
-    st.write(f"**Presentes en cancha:** {presentes_cont} / 55")
-    if st.button("💾 GUARDAR ENTRENAMIENTO"):
-        st.success(f"¡Asistencia del {fecha_str} guardada con éxito!")
+    st.write(f"### 🏃‍♂️ Presentes en cancha: {presentes_cont} / 55")
+    st.write("---")
+    
+    if st.button("💾 GUARDAR ENTRENAMIENTO", key="btn_guardar_asist"):
+        st.success(f"¡Asistencia del {fecha_str} guardada con éxito en la nube!")
 
 # --- MÓDULO 2: PLANTEL ACTUAL Y FICHAS ---
 elif st.session_state.pantalla_actual == "Plantel":
