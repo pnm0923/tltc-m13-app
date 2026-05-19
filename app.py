@@ -124,23 +124,29 @@ elif st.session_state.pantalla_actual == "Asistencia":
     fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today())
     fecha_str = fecha.strftime("%Y-%m-%d")
     
-    # Inicializar fecha si no existe en la base de datos
+    # Inicializar fecha si no existe en los datos
     if fecha_str not in st.session_state.asistencias:
         st.session_state.asistencias[fecha_str] = {id_: False for id_ in st.session_state.plantel.keys()}
     
-    # BOTONES DE ACCIÓN MASIVA (Corregidos con rerun inmediato)
+    # BOTONES DE ACCIÓN MASIVA (Corregidos para forzar el tilde visual)
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("✔️ Todos Presentes", key="btn_todos_pres"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.asistencias[fecha_str][id_] = True
-            st.rerun()  # Fuerza a la app a redibujar los checkboxes con el tilde puesto
+                # Esto obliga al componente visual a ponerse en True
+                st.session_state[f"chk_asist_{id_}_{fecha_str}"] = True
+            st.rerun()
             
     with col_btn2:
         if st.button("❌ Reiniciar (Todos Ausentes)", key="btn_todos_aus"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.asistencias[fecha_str][id_] = False
-            st.rerun()  # Fuerza a la app a destildar todo al instante
+                # Esto obliga al componente visual a ponerse en False
+                st.session_state[f"chk_asist_{id_}_{fecha_str}"] = True  # Al cambiar la base, reiniciamos el control
+                if f"chk_asist_{id_}_{fecha_str}" in st.session_state:
+                    st.session_state[f"chk_asist_{id_}_{fecha_str}"] = False
+            st.rerun()
             
     buscar = st.text_input("🔍 Buscar jugador para asistencia...")
     st.write("---")
@@ -151,16 +157,18 @@ elif st.session_state.pantalla_actual == "Asistencia":
     for id_, datos in st.session_state.plantel.items():
         nombre_completo = f"{datos['apellido']} {datos['nombre']}"
         if buscar.lower() in nombre_completo.lower():
-            # Traemos el estado real guardado en memoria
-            estado_guardado = st.session_state.asistencias[fecha_str].get(id_, False)
+            # Clave única para la memoria visual del componente
+            clave_check = f"chk_asist_{id_}_{fecha_str}"
             
-            # Dibujamos el checkbox usando el estado real de la base de datos
-            check = st.checkbox(nombre_completo, value=estado_guardado, key=f"chk_asist_{id_}_{fecha_str}")
+            # Sincronizamos la memoria visual con la base de datos interna si no estaba creada
+            if clave_check not in st.session_state:
+                st.session_state[clave_check] = st.session_state.asistencias[fecha_str].get(id_, False)
             
-            # Si el usuario lo toca manualmente en el Xiaomi, actualiza la memoria
-            if check != estado_guardado:
-                st.session_state.asistencias[fecha_str][id_] = check
-                st.rerun()
+            # Dibujamos el checkbox usando el estado controlado por la sesión
+            check = st.checkbox(nombre_completo, key=clave_check)
+            
+            # Guardamos el cambio que hagas con el dedo en tu Xiaomi hacia la base de datos
+            st.session_state.asistencias[fecha_str][id_] = check
                 
             if check:
                 presentes_cont += 1
