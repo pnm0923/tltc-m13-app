@@ -50,7 +50,7 @@ except Exception as e:
 # Lista de puestos oficiales
 LISTA_PUESTOS = ["Sin Puesto", "Pilar", "Hooker", "2° Linea", "3° Linea", "Medio scrum", "Apertura", "Centro", "Wing", "Fullback"]
 
-# BASE DE DATOS SEMILLA (Los 55 chicos de la M-13)
+# 2. BASE DE DATOS SEMILLA (Los 55 chicos de la M-13)
 if 'plantel' not in st.session_state:
     nombres_crudos = [
         "ARGAÑARAZ BAUTISTA", "BANEGAS MAXIMO", "BELLIDO IVO", "BERTINI ANTONIO", "BERTINI DIEGO",
@@ -127,7 +127,7 @@ elif st.session_state.pantalla_actual == "Asistencia":
     fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today(), key="selector_fecha_entr")
     fecha_str = fecha.strftime("%Y-%m-%d")
     
-    # [LOGICA BLINDADA] Descargar desde la nube SOLO UNA VEZ al cambiar de fecha
+    # Descargar desde la nube SOLO UNA VEZ al cambiar de fecha
     if f"last_loaded_date" not in st.session_state or st.session_state.last_loaded_date != fecha_str:
         try:
             res = supabase.table("asistencias_entrenamiento").select("*").eq("fecha", fecha_str).execute()
@@ -158,29 +158,25 @@ elif st.session_state.pantalla_actual == "Asistencia":
         nombre_completo = f"{datos['apellido']} {datos['nombre']}"
         clave_check = f"chk_asist_{id_}_{fecha_str}"
         
-        # Inicializar llave por las dudas
         if clave_check not in st.session_state:
             st.session_state[clave_check] = False
             
         if buscar.lower() in nombre_completo.lower():
-            # Dibujamos de forma limpia. Sin el 'value' que causaba el conflicto técnico.
             check = st.checkbox(nombre_completo, key=clave_check)
-            if st.session_state[clave_check]: 
-                presentes_cont += 1
+            if st.session_state[clave_check]: presentes_cont += 1
         else:
-            # Si está oculto por el buscador pero tildado, también suma
-            if st.session_state[clave_check]: 
-                presentes_cont += 1
+            if st.session_state[clave_check]: presentes_cont += 1
                 
     st.write(f"### 🏃‍♂️ Presentes en esta fecha: {presentes_cont} / 55")
     
     if st.button("💾 GUARDAR ENTRENAMIENTO EN LA NUBE", key="btn_guardar_asist"):
-        with st.spinner("Subiendo datos a Supabase..."):
+        with St.spinner("Subiendo datos a Supabase..."):
             for id_ in st.session_state.plantel.keys():
                 val_presente = st.session_state.get(f"chk_asist_{id_}_{fecha_str}", False)
+                # [SOLUCIÓN DEFINITIVA] Pasamos el nombre real de la regla única: 'fecha_jugador_unique'
                 supabase.table("asistencias_entrenamiento").upsert({
                     "fecha": fecha_str, "jugador_id": id_, "presente": val_presente
-                }, on_conflict="fecha,jugador_id").execute()
+                }, on_conflict="fecha_jugador_unique").execute()
             st.success("¡Asistencia guardada permanentemente en Supabase!")
 
 # --- MÓDULO 2: PLANTEL ACTUAL ---
@@ -232,7 +228,7 @@ elif st.session_state.pantalla_actual == "Partidos":
     bloque_corto = 'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'
     llave_partido = f"{fecha_p_str}_{bloque_corto}"
     
-    # [LOGICA BLINDADA] Descargar desde la nube SOLO UNA VEZ al cambiar de partido/bloque
+    # Descargar desde la nube SOLO UNA VEZ al cambiar de partido/bloque
     if f"last_loaded_match" not in st.session_state or st.session_state.last_loaded_match != llave_partido:
         try:
             res = supabase.table("convocados_partidos").select("*").eq("fecha", fecha_p_str).eq("bloque", bloque_corto).execute()
@@ -264,13 +260,10 @@ elif st.session_state.pantalla_actual == "Partidos":
                 st.session_state[clave_check_p] = False
                 
             if buscar_p.lower() in nombre_completo.lower():
-                # Dibujamos de forma limpia e independiente
                 check_p = st.checkbox(nombre_completo, key=clave_check_p)
-                if st.session_state[clave_check_p]: 
-                    convocados_cont += 1
+                if st.session_state[clave_check_p]: convocados_cont += 1
             else:
-                if st.session_state[clave_check_p]: 
-                    convocados_cont += 1
+                if st.session_state[clave_check_p]: convocados_cont += 1
 
         st.write(f"### 📈 Total Convocados: {convocados_cont} chicos")
         if st.button("💾 GUARDAR PARTIDO EN LA NUBE", key="btn_guardar_partido"):
@@ -279,14 +272,14 @@ elif st.session_state.pantalla_actual == "Partidos":
                 with st.spinner("Subiendo convocatoria..."):
                     for id_ in st.session_state.plantel.keys():
                         val_convocado = st.session_state.get(f"chk_p_visual_{id_}_{llave_partido}", False)
+                        # [SOLUCIÓN DEFINITIVA] Pasamos el nombre real de la regla única: 'fecha_bloque_jugador_unique'
                         supabase.table("convocados_partidos").upsert({
                             "fecha": fecha_p_str, "bloque": bloque_corto, "rival": rival_seleccionado,
                             "jugador_id": id_, "convocado": val_convocado
-                        }, on_conflict="fecha,bloque,jugador_id").execute()
-                st.success("¡Convocatoria guardada permanentemente en la nube!")
+                        }, on_conflict="fecha_bloque_jugador_unique").execute()
+                st.success("¡Convocatoria guardada permanentemente en Supabase!")
 
     with tab_placa:
-        # Contamos cuántas opciones están realmente tildadas en memoria
         total_tildados_placa = sum([st.session_state.get(f"chk_p_visual_{id_}_{llave_partido}", False) for id_ in st.session_state.plantel.keys()])
         
         if rival_seleccionado == "Seleccionar rival..." or total_tildados_placa == 0:
