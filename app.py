@@ -5,7 +5,7 @@ import pandas as pd
 # CONFIGURACIÓN DE LA PÁGINA (Estilo TLTC)
 st.set_page_config(page_title="TLTC M-13", page_icon="🏉", layout="centered")
 
-# Inyección de CSS para diseño responsivo en tu Xiaomi
+# Inyección de CSS para diseño responsivo en tu Xiaomi y Placa Estilo Pro
 st.markdown("""
     <style>
     .stApp { backgroundColor: #1E1E1E; color: white; }
@@ -24,6 +24,25 @@ st.markdown("""
     .menu-card h4 { margin: 0; color: white !important; font-size: 18px; }
     .menu-card p { margin: 5px 0 0 0; color: #CCCCCC; font-size: 13px; }
     
+    /* Estilo de la Placa Oficial de Matchday */
+    .placa-convocados {
+        background-color: #111111; border: 3px solid #F4C430; border-radius: 15px;
+        padding: 25px; text-align: center; font-family: 'Arial Black', sans-serif;
+        box-shadow: 0px 4px 15px rgba(0,0,0,0.5);
+    }
+    .placa-titulo { color: #F4C430 !important; font-size: 26px; margin-bottom: 2px; text-transform: uppercase; }
+    .placa-sub { color: #FFFFFF !important; font-size: 16px; margin-bottom: 15px; font-weight: bold; }
+    .placa-puesto-header {
+        background-color: #2B3E75; color: #F4C430 !important;
+        padding: 4px 10px; border-radius: 5px; font-size: 14px;
+        text-transform: uppercase; margin-top: 15px; text-align: left;
+        border-left: 5px solid #F4C430;
+    }
+    .placa-jugador {
+        color: #FFFFFF; font-size: 15px; text-align: left;
+        padding-left: 15px; margin: 4px 0; font-family: 'Arial', sans-serif;
+    }
+    
     /* Botones del sistema de Streamlit */
     .stButton>button { 
         background-color: #2B3E75 !important; color: white !important; 
@@ -34,6 +53,9 @@ st.markdown("""
     div[data-testid="stExpander"] { background-color: #2A2A2A !important; border-radius: 8px; }
     </style>
 """, unsafe_allow_html=True)
+
+# Lista de puestos oficiales solicitados
+LISTA_PUESTOS = ["Sin Puesto", "Pilar", "Hooker", "2° Linea", "3° Linea", "Medio scrum", "Apertura", "Centro", "Wing", "Fullback"]
 
 # 2. BASE DE DATOS SEMILLA (Los 55 chicos de la M-13)
 if 'plantel' not in st.session_state:
@@ -56,6 +78,7 @@ if 'plantel' not in st.session_state:
             "apellido": nombre.split()[0],
             "nombre": " ".join(nombre.split()[1:]),
             "nacimiento": datetime.date(2013, 1, 1),
+            "puesto": "Sin Puesto",
             "foto": None,
             "notas_tecnicas": "Sin observaciones técnicas.",
             "notas_actitud": "Buena predisposición en el club."
@@ -64,6 +87,9 @@ if 'plantel' not in st.session_state:
 
 if 'asistencias' not in st.session_state:
     st.session_state.asistencias = {}
+
+if 'partidos' not in st.session_state:
+    st.session_state.partidos = {}
 
 # Gestión de pantallas mediante Estado de Sesión
 if 'pantalla_actual' not in st.session_state:
@@ -82,21 +108,19 @@ if st.session_state.pantalla_actual == "Inicio":
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
-            # Busca la imagen directamente en la carpeta de tu repositorio
             st.image("escudo.png", use_container_width=True)
         except:
-            # Si por alguna razón no se subió bien, muestra un texto para que no rompa la app
             st.markdown("<h3 style='text-align:center;'>🟨 TLTC M-13 🟦</h3>", unsafe_allow_html=True)
     
     st.title("TLTC M-13")
     st.write("Panel de Control del Entrenador")
     st.write("---")
     
-    # Grid de opciones interactivas para simular los botones del diseño original
+    # Grid de opciones interactivas
     col_a, col_b = st.columns(2)
     
     with col_a:
-        st.markdown('<div class="menu-card"><h4>👥 Plantel Actual</h4><p>Lista, datos y fotos de perfil</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="menu-card"><h4>👥 Plantel Actual</h4><p>Lista, puestos y fotos de perfil</p></div>', unsafe_allow_html=True)
         if st.button("Ir a Plantel", key="btn_plantel"):
             st.session_state.pantalla_actual = "Plantel"
             st.rerun()
@@ -107,7 +131,7 @@ if st.session_state.pantalla_actual == "Inicio":
             st.rerun()
 
     with col_b:
-        st.markdown('<div class="menu-card"><h4>🏉 Partidos</h4><p>Selección y minutos jugados</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="menu-card"><h4>🏉 Partidos y Placas</h4><p>Selección por Bloques y Placas</p></div>', unsafe_allow_html=True)
         if st.button("Ir a Partidos", key="btn_partidos"):
             st.session_state.pantalla_actual = "Partidos"
             st.rerun()
@@ -121,18 +145,14 @@ if st.session_state.pantalla_actual == "Inicio":
 elif st.session_state.pantalla_actual == "Asistencia":
     st.header("📋 Asistencia a Entrenamiento")
     
-    # 1. Selector de fecha
     fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today(), key="selector_fecha_entr")
     fecha_str = fecha.strftime("%Y-%m-%d")
     
-    # [CORRECCIÓN CRUCIAL] Inicializar la base de datos de asistencia SOLO si realmente no existe NADA guardado para ese día
     if fecha_str not in st.session_state.asistencias:
         st.session_state.asistencias[fecha_str] = {id_: False for id_ in st.session_state.plantel.keys()}
 
-    # Sincronizar la memoria visual de los checkboxes con lo que realmente hay en la base de datos de esa fecha
     for id_ in st.session_state.plantel.keys():
         clave_check = f"chk_asist_{id_}_{fecha_str}"
-        # Forzamos a que el componente visual tenga EXACTAMENTE el mismo valor que guardaste en la asistencia
         st.session_state[clave_check] = st.session_state.asistencias[fecha_str][id_]
 
     # BOTONES DE ACCIÓN MASIVA
@@ -153,17 +173,12 @@ elif st.session_state.pantalla_actual == "Asistencia":
     st.write("---")
     
     presentes_cont = 0
-    
-    # LISTADO INTERACTIVO DE ASISTENCIA
     for id_, datos in st.session_state.plantel.items():
         nombre_completo = f"{datos['apellido']} {datos['nombre']}"
         if buscar.lower() in nombre_completo.lower():
             clave_check = f"chk_asist_{id_}_{fecha_str}"
-            
-            # Dibujamos el checkbox
             check = st.checkbox(nombre_completo, key=clave_check)
             
-            # Si el entrenador cambia el tilde con el dedo en el Xiaomi, impacta directo en la base de datos
             if check != st.session_state.asistencias[fecha_str][id_]:
                 st.session_state.asistencias[fecha_str][id_] = check
                 st.rerun()
@@ -184,9 +199,19 @@ elif st.session_state.pantalla_actual == "Plantel":
     
     for id_, datos in st.session_state.plantel.items():
         nombre_completo = f"{datos['apellido']}, {datos['nombre']}"
+        puesto_actual = datos.get("puesto", "Sin Puesto")
+        
         if buscar_p.lower() in nombre_completo.lower():
-            with st.expander(f"🏃‍♂️ {nombre_completo}"):
-                st.write(f"**Categoría:** 2013 (M-13)")
+            with st.expander(f"🏃‍♂️ {nombre_completo} | 🏷️ {puesto_actual}"):
+                
+                # Desplegable interactivo para asignar el puesto
+                indice_puesto = LISTA_PUESTOS.index(puesto_actual) if puesto_actual in LISTA_PUESTOS else 0
+                nuevo_puesto = st.selectbox(f"Asignar Puesto para {datos['nombre']}:", LISTA_PUESTOS, index=indice_puesto, key=f"puesto_{id_}")
+                
+                if nuevo_puesto != puesto_actual:
+                    st.session_state.plantel[id_]["puesto"] = nuevo_puesto
+                    st.rerun()
+                
                 foto_archivo = st.file_uploader(f"Foto de Perfil", type=["jpg", "png", "jpeg"], key=f"foto_{id_}")
                 if foto_archivo:
                     st.session_state.plantel[id_]["foto"] = foto_archivo
@@ -197,51 +222,21 @@ elif st.session_state.pantalla_actual == "Plantel":
 # --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS ---
 elif st.session_state.pantalla_actual == "Partidos":
     st.header("🏉 Carga de Partidos y Bloques")
-    
-    # 1. Configuración del Partido de la Fecha
     st.markdown("### 1. Datos del Encuentro")
     
-    # Lista oficial de rivales de la URT provista por el entrenador
-    lista_rivales = [
-        "Seleccionar rival...",
-        "Tucumán Rugby",
-        "Universitario",
-        "Jockey Club",
-        "Cardenales",
-        "Natación y Gimnasia",
-        "Los Tarcos",
-        "Lince",
-        "Huirapuca",
-        "Aguará Guazú",
-        "San Martín/Liceo/Corsarios"
-    ]
+    lista_rivales = ["Seleccionar rival...", "Tucumán Rugby", "Universitario", "Jockey Club", "Cardenales", "Natación y Gimnasia", "Los Tarcos", "Lince", "Huirapuca", "Aguará Guazú", "San Martín/Liceo/Corsarios"]
     
     col_p1, col_p2 = st.columns(2)
     with col_p1:
-        bloque_seleccionado = st.selectbox(
-            "Seleccionar Bloque del TLTC",
-            ["Tucumán Lawn Tennis Azul", "Tucumán Lawn Tennis Amarillo"],
-            key="sb_bloque"
-        )
+        bloque_seleccionado = st.selectbox("Seleccionar Bloque del TLTC", ["Tucumán Lawn Tennis Azul", "Tucumán Lawn Tennis Amarillo"], key="sb_bloque")
     with col_p2:
-        # Reemplazamos el text_input por un combobox (selectbox)
-        rival_seleccionado = st.selectbox(
-            "Rival de la Fecha",
-            lista_rivales,
-            key="sb_rival"
-        )
+        rival_seleccionado = st.selectbox("Rival de la Fecha", lista_rivales, key="sb_rival")
         
     fecha_partido = st.date_input("Fecha del Partido", datetime.date.today(), key="di_fecha_partido")
     fecha_p_str = fecha_partido.strftime("%Y-%m-%d")
     
-    # Estructura de base de datos para partidos en la memoria temporal
-    if 'partidos' not in st.session_state:
-        st.session_state.partidos = {}
-        
-    # Llave única que combina fecha y bloque para que no se pisen (Ej: "2026-05-23_Azul")
     llave_partido = f"{fecha_p_str}_{'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'}"
     
-    # Inicializar el partido si es nuevo
     if llave_partido not in st.session_state.partidos:
         st.session_state.partidos[llave_partido] = {
             "rival": "",
@@ -249,70 +244,87 @@ elif st.session_state.pantalla_actual == "Partidos":
             "convocados": {id_: False for id_ in st.session_state.plantel.keys()}
         }
     
-    # Guardamos el rival seleccionado si no es la opción por defecto
     if rival_seleccionado != "Seleccionar rival...":
         st.session_state.partidos[llave_partido]["rival"] = rival_seleccionado
 
     st.write("---")
     
-    # 2. Selección de Jugadores para este bloque
-    st.markdown(f"### 👥 Convocados para el Bloque: **{bloque_seleccionado}**")
-    st.caption("Tildá a los chicos que van a jugar en este bloque este fin de semana.")
+    # SISTEMA DE PESTAÑAS (Manejo limpio de Carga vs Placa)
+    tab_carga, tab_placa = st.tabs(["📝 Cargar Convocados", "🖼️ Ver Placa de Matchday"])
     
-    # Botón para limpiar rápido la lista de convocados
-    if st.button("❌ Limpiar Convocatoria de este Bloque", key="btn_limpiar_partido"):
-        for id_ in st.session_state.plantel.keys():
-            st.session_state.partidos[llave_partido]["convocados"][id_] = False
-            if f"chk_partido_{id_}_{llave_partido}" in st.session_state:
-                st.session_state[f"chk_partido_{id_}_{llave_partido}"] = False
-        st.rerun()
+    with tab_carga:
+        if st.button("❌ Limpiar Convocatoria de este Bloque", key="btn_limpiar_partido"):
+            for id_ in st.session_state.plantel.keys():
+                st.session_state.partidos[llave_partido]["convocados"][id_] = False
+            st.rerun()
 
-    buscar_p = st.text_input("🔍 Buscar jugador para convocar...")
-    
-    st.write("---")
-    convocados_cont = 0
-    
-    # LISTADO DE JUGADORES
-    for id_, datos in st.session_state.plantel.items():
-        nombre_completo = f"{datos['apellido']} {datos['nombre']}"
+        buscar_p = st.text_input("🔍 Buscar jugador para convocar...")
+        st.write("---")
         
-        if buscar_p.lower() in nombre_completo.lower():
-            clave_check_p = f"chk_partido_{id_}_{llave_partido}"
+        convocados_cont = 0
+        for id_, datos in st.session_state.plantel.items():
+            # Mostramos el puesto también en la lista de partidos para guiarte
+            nombre_completo = f"{datos['apellido']} {datos['nombre']} ({datos['puesto']})"
             
-            # Buscamos si ya está guardado como convocado en este partido
-            estado_guardado_p = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
-            
-            # Control cruzado sutil: Verificar si el chico ya está en el OTRO bloque para la misma fecha
-            otra_llave = f"{fecha_p_str}_{'Amarillo' if 'Azul' in bloque_seleccionado else 'Azul'}"
-            ya_juega_en_otro = False
-            if otra_llave in st.session_state.partidos:
-                ya_juega_en_otro = st.session_state.partidos[otra_llave]["convocados"].get(id_, False)
-            
-            # Dibujamos el checkbox. Si ya juega en el otro bloque, le agregamos un aviso al nombre
-            etiqueta = f"🏃‍♂️ {nombre_completo} ⚠️ (Ya está en el otro Bloque)" if ya_juega_en_otro else nombre_completo
-            
-            # Sincronizamos la interfaz
-            if clave_check_p not in st.session_state:
-                st.session_state[clave_check_p] = estado_guardado_p
+            if buscar_p.lower() in nombre_completo.lower():
+                clave_check_p = f"chk_partido_{id_}_{llave_partido}"
+                estado_guardado_p = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
                 
-            check_p = st.checkbox(etiqueta, key=clave_check_p)
-            
-            # Guardamos el tilde del entrenador
-            st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
-            
-            if check_p:
-                convocados_cont += 1
+                otra_llave = f"{fecha_p_str}_{'Amarillo' if 'Azul' in bloque_seleccionado else 'Azul'}"
+                ya_juega_en_otro = False
+                if otra_llave in st.session_state.partidos:
+                    ya_juega_en_otro = st.session_state.partidos[otra_llave]["convocados"].get(id_, False)
+                
+                etiqueta = f"🏃‍♂️ {nombre_completo} ⚠️ (Ya está en el otro Bloque)" if ya_juega_en_otro else nombre_completo
+                
+                st.session_state[clave_check_p] = estado_guardado_p
+                check_p = st.checkbox(etiqueta, key=clave_check_p)
+                
+                if check_p != st.session_state.partidos[llave_partido]["convocados"][id_]:
+                    st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
+                    st.rerun()
+                
+                if check_p:
+                    convocados_cont += 1
 
-    st.write("---")
-    st.write(f"### 📈 Total Convocados {bloque_seleccionado}: {convocados_cont} chicos")
-    
-    if st.button("💾 GUARDAR CONVOCATORIA DE PARTIDO", key="btn_guardar_partido"):
+        st.write(f"### 📈 Total Convocados {bloque_seleccionado}: {convocados_cont} chicos")
+        if st.button("💾 GUARDAR CONVOCATORIA DE PARTIDO", key="btn_guardar_partido"):
+            if rival_seleccionado == "Seleccionar rival...":
+                st.error("Por favor, elegí un rival de la lista antes de guardar.")
+            else:
+                st.success(f"¡Partido vs. {rival_seleccionado} ({bloque_seleccionado}) guardado correctamente!")
+
+    with tab_placa:
         if rival_seleccionado == "Seleccionar rival...":
-            st.error("Por favor, elegí un rival de la lista antes de guardar.")
+            st.warning("⚠️ Seleccioná un rival en la parte superior para generar la placa visual.")
         else:
-            st.success(f"¡Partido vs. {rival_seleccionado} ({bloque_seleccionado}) guardado correctamente!")
+            # DIBUJO DE LA PLACA VISUAL
+            st.markdown(f"""
+            <div class="placa-convocados">
+                <div class="placa-titulo">CONVOCADOS M-13</div>
+                <div class="placa-sub">{bloque_seleccionado.upper()} vs {rival_seleccionado.upper()}</div>
+                <div style="color:#F4C430; font-size:12px; margin-bottom:20px;">📅 FECHA: {fecha_p_str}</div>
+            """, unsafe_allow_html=True)
+            
+            # Recorremos los puestos oficiales uno por uno para armar los subgrupos
+            for puesto in LISTA_PUESTOS:
+                chicos_en_puesto = []
+                for id_jugador, convocado in st.session_state.partidos[llave_partido]["convocados"].items():
+                    if convocado:
+                        datos_chico = st.session_state.plantel[id_jugador]
+                        if datos_chico["puesto"] == puesto:
+                            chicos_en_puesto.append(f"{datos_chico['apellido']} {datos_chico['nombre']}")
+                
+                # Si este puesto tiene jugadores convocados, lo imprimimos en la placa
+                if chicos_en_puesto:
+                    st.markdown(f'<div class="placa-puesto-header">{puesto}</div>', unsafe_allow_html=True)
+                    for chico in chicos_en_puesto:
+                        st.markdown(f'<div class="placa-jugador">• {chico}</div>', unsafe_allow_html=True)
+                        
+            st.markdown("</div>", unsafe_allow_html=True)
+            st.caption("📱 ¡Sacale una captura de pantalla desde tu Xiaomi para mandarla al grupo de WhatsApp!")
 
-# --- MÓDULO 4: PROXIMAMENTE ESTADÍSTICAS ---
+# --- MÓDULO 4: ESTADÍSTICAS ---
 elif st.session_state.pantalla_actual == "Estadísticas":
     st.header("📊 Estadísticas de Rendimiento")
     if st.session_state.asistencias:
