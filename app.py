@@ -81,8 +81,8 @@ if 'plantel' not in st.session_state:
             j_id = str(row["jugador_id"])
             if j_id in st.session_state.plantel:
                 st.session_state.plantel[j_id]["puesto"] = row["puesto"]
-                st.session_state.plantel[j_id]["notas_actitud"] = row["notas_actitud"]
-                st.session_state.plantel[j_id]["notas_tecnicas"] = row["notas_tecnicas"]
+                st.session_state.plantel[j_id]["notas_actitud"] = row["notas_actitud"] if row["notas_actitud"] else ""
+                st.session_state.plantel[j_id]["notas_tecnicas"] = row["notas_tecnicas"] if row["notas_tecnicas"] else ""
     except:
         pass
 
@@ -170,22 +170,22 @@ elif st.session_state.pantalla_actual == "Asistencia":
     st.write(f"### 🏃‍♂️ Presentes en esta fecha: {presentes_cont} / 55")
     
     if st.button("💾 GUARDAR ENTRENAMIENTO EN LA NUBE", key="btn_guardar_asist"):
+        # [CORRECCIÓN CORRECTA DE SINTAXIS]
         with st.spinner("Subiendo datos a Supabase..."):
             try:
-                # [ESTRATEGIA BLINDADA 1] Limpiamos la fecha seleccionada para evitar conflictos de claves
+                # Limpiamos los registros de la fecha seleccionada para evitar duplicaciones
                 supabase.table("asistencias_entrenamiento").delete().eq("fecha", fecha_str).execute()
                 
-                # Preparamos el paquete de datos en una lista limpia
                 filas_asistencia = []
                 for id_ in st.session_state.plantel.keys():
                     val_presente = st.session_state.get(f"chk_asist_{id_}_{fecha_str}", False)
                     filas_asistencia.append({"fecha": fecha_str, "jugador_id": id_, "presente": val_presente})
                 
-                # Se inserta todo junto de un solo golpe (Ultra veloz y compatible)
+                # Inserción limpia masiva en formato de lista
                 supabase.table("asistencias_entrenamiento").insert(filas_asistencia).execute()
-                st.success("¡Asistencia guardada permanentemente en Supabase!")
-            except Exception as error_db:
-                st.error(f"Falla de comunicación con el servidor. Intenta de nuevo.")
+                st.success("¡Asistencia guardada permanentemente en la nube!")
+            except Exception as e:
+                st.error("Error al guardar en la base de datos. Verifica los datos.")
 
 # --- MÓDULO 2: PLANTEL ACTUAL ---
 elif st.session_state.pantalla_actual == "Plantel":
@@ -207,6 +207,7 @@ elif st.session_state.pantalla_actual == "Plantel":
                 nota_act = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
                 nota_tec = st.text_area("🏉 Notas Técnicas:", datos["notas_tecnicas"], key=f"tec_{id_}")
                 
+                # Almacenamos localmente en memoria cada cambio
                 st.session_state.plantel[id_]["puesto"] = nuevo_puesto
                 st.session_state.plantel[id_]["notas_actitud"] = nota_act
                 st.session_state.plantel[id_]["notas_tecnicas"] = nota_tec
@@ -215,22 +216,18 @@ elif st.session_state.pantalla_actual == "Plantel":
     if st.button("💾 GUARDAR MODIFICACIONES DEL PLANTEL", key="btn_guardar_fichas_nube"):
         with st.spinner("Sincronizando puestos y notas con Supabase..."):
             try:
-                # [ESTRATEGIA BLINDADA 2] Vaciamos la tabla e insertamos el lote completo estructurado
-                supabase.table("datos_plantel").delete().neq("jugador_id", "0").execute()
-                
-                filas_plantel = []
+                # [SOLUCIÓN DEL PLANTEL BLINDADA] Usamos upsert nativo sin on_conflict ya que jugador_id es primary key
                 for id_, datos in st.session_state.plantel.items():
-                    filas_plantel.append({
+                    supabase.table("datos_plantel").upsert({
                         "jugador_id": str(id_), 
                         "puesto": datos["puesto"], 
                         "notas_actitud": datos["notas_actitud"], 
                         "notas_tecnicas": datos["notas_tecnicas"]
-                    })
-                supabase.table("datos_plantel").insert(filas_plantel).execute()
+                    }).execute()
                 st.success("¡Todos los puestos y notas técnicas se guardaron permanentemente en la nube!")
                 st.rerun()
-            except:
-                st.error("Error al guardar las fichas. Intenta nuevamente.")
+            except Exception as e:
+                st.error("Error al guardar el plantel en Supabase.")
 
 # --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS ---
 elif st.session_state.pantalla_actual == "Partidos":
@@ -292,7 +289,7 @@ elif st.session_state.pantalla_actual == "Partidos":
             else:
                 with st.spinner("Subiendo convocatoria..."):
                     try:
-                        # [ESTRATEGIA BLINDADA 3] Borrado e inserción limpia para partidos
+                        # Limpiamos convocatoria previa de este bloque y fecha
                         supabase.table("convocados_partidos").delete().eq("fecha", fecha_p_str).eq("bloque", bloque_corto).execute()
                         
                         filas_partidos = []
@@ -303,7 +300,7 @@ elif st.session_state.pantalla_actual == "Partidos":
                                 "jugador_id": id_, "convocado": val_convocado
                             })
                         supabase.table("convocados_partidos").insert(filas_partidos).execute()
-                        st.success("¡Convocatoria guardada permanentemente en Supabase!")
+                        st.success("¡Convocatoria guardada permanentemente en la nube!")
                     except:
                         st.error("Error de red al guardar el partido.")
 
