@@ -50,7 +50,7 @@ if 'plantel' not in st.session_state:
         "BUENO RISCO LISANDRO", "CANO PAOLETTI SALVADOR", "CARRASCO IGNACIO", "CISNEROS POSSE MAXIMO",
         "CORONEL BLAS", "CORONEL STEFANO", "CORROTO RODRIGO", "CRIPOVICH JUAN IGNACIO", "CRUZADO BAUTISTA",
         "DEL TOSO BENJAMÍN", "FERNANDEZ CORREA JUAN MARTIN", "FERNANDEZ FELIPE IGNACIO", "GARCIA COLLADOS MAXIMO",
-        "GIBILISCO MATEO", "GIJON BENJAMIN", "GUARDIA GERONIMO", "HERRERA BENJAMIN", "INGARAMO BAUTISTA",
+        "GIBILISCO MATEO", "GIJON BENJAMIN", "GUARDIA GERONIMO", HERRERA BENJAMIN", "INGARAMO BAUTISTA",
         "JUAREZ COLLADO LUCAS", "LIZARRAGA PALACIOS BAUTISTA", "LOBO HERRERA VICENTE", "MAIZEL FACUNDO",
         "MARIGLIANO LORENZO", "MARQUESTO MARTIN", "MEJAIL FRANCISCO", "MOLINA FRANCISCO", "MOROF MAXIMILANO",
         "NELLA CASTRO ANTONIO", "NORES PONDAL LORENZO", "ORTIZ FELIPE", "PALAVECINO JOAQUIN", "PEIRO JUAN PABLO",
@@ -81,15 +81,9 @@ if 'partidos' not in st.session_state:
 if 'pantalla_actual' not in st.session_state:
     st.session_state.pantalla_actual = "Inicio"
 
-# Menú de navegación lateral
-with st.sidebar:
-    st.markdown("### Menú de Navegación")
-    if st.button("🏠 Volver al Inicio"):
-        st.session_state.pantalla_actual = "Inicio"
-        st.rerun()
-
 # --- PANTALLA PRINCIPAL (HOME) ---
 if st.session_state.pantalla_actual == "Inicio":
+    # Imagen del Escudo Local
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
@@ -101,7 +95,9 @@ if st.session_state.pantalla_actual == "Inicio":
     st.write("Panel de Control del Entrenador")
     st.write("---")
     
+    # Grid de opciones interactivas
     col_a, col_b = st.columns(2)
+    
     with col_a:
         st.markdown('<div class="menu-card"><h4>👥 Plantel Actual</h4><p>Lista, puestos y fotos de perfil</p></div>', unsafe_allow_html=True)
         if st.button("Ir a Plantel", key="btn_plantel"):
@@ -112,6 +108,7 @@ if st.session_state.pantalla_actual == "Inicio":
         if st.button("Ir a Asistencia", key="btn_asistencia"):
             st.session_state.pantalla_actual = "Asistencia"
             st.rerun()
+
     with col_b:
         st.markdown('<div class="menu-card"><h4>🏉 Partidos y Placas</h4><p>Selección por Bloques y Placas</p></div>', unsafe_allow_html=True)
         if st.button("Ir a Partidos", key="btn_partidos"):
@@ -125,6 +122,11 @@ if st.session_state.pantalla_actual == "Inicio":
 
 # --- MÓDULO 1: ASISTENCIA A ENTRENAMIENTO ---
 elif st.session_state.pantalla_actual == "Asistencia":
+    # Botón de regreso directo en la interfaz central
+    if st.button("⬅️ Volver al Menú Principal", key="back_asist"):
+        st.session_state.pantalla_actual = "Inicio"
+        st.rerun()
+        
     st.header("📋 Asistencia a Entrenamiento")
     fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today(), key="selector_fecha_entr")
     fecha_str = fecha.strftime("%Y-%m-%d")
@@ -136,12 +138,14 @@ elif st.session_state.pantalla_actual == "Asistencia":
         clave_check = f"chk_asist_{id_}_{fecha_str}"
         st.session_state[clave_check] = st.session_state.asistencias[fecha_str][id_]
 
+    # BOTONES DE ACCIÓN MASIVA
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("✔️ Todos Presentes", key="btn_todos_pres"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.asistencias[fecha_str][id_] = True
             st.rerun()
+            
     with col_btn2:
         if st.button("❌ Reiniciar (Todos Ausentes)", key="btn_todos_aus"):
             for id_ in st.session_state.plantel.keys():
@@ -157,17 +161,24 @@ elif st.session_state.pantalla_actual == "Asistencia":
         if buscar.lower() in nombre_completo.lower():
             clave_check = f"chk_asist_{id_}_{fecha_str}"
             check = st.checkbox(nombre_completo, key=clave_check)
+            
             if check != st.session_state.asistencias[fecha_str][id_]:
                 st.session_state.asistencias[fecha_str][id_] = check
                 st.rerun()
+                
             if check: presentes_cont += 1
                 
     st.write(f"### 🏃‍♂️ Presentes en esta fecha: {presentes_cont} / 55")
+    st.write("---")
     if st.button("💾 GUARDAR ENTRENAMIENTO", key="btn_guardar_asist"):
         st.success(f"¡Asistencia del {fecha_str} guardada con éxito!")
 
-# --- MÓDULO 2: PLANTEL ACTUAL ---
+# --- MÓDULO 2: PLANTEL ACTUAL Y FICHAS ---
 elif st.session_state.pantalla_actual == "Plantel":
+    if st.button("⬅️ Volver al Menú Principal", key="back_plantel"):
+        st.session_state.pantalla_actual = "Inicio"
+        st.rerun()
+        
     st.header("👥 Plantel Completo M-13")
     buscar_p = st.text_input("🔍 Buscar en el plantel...")
     
@@ -179,6 +190,7 @@ elif st.session_state.pantalla_actual == "Plantel":
             with st.expander(f"🏃‍♂️ {nombre_completo} | 🏷️ {puesto_actual}"):
                 indice_puesto = LISTA_PUESTOS.index(puesto_actual) if puesto_actual in LISTA_PUESTOS else 0
                 nuevo_puesto = st.selectbox(f"Asignar Puesto para {datos['nombre']}:", LISTA_PUESTOS, index=indice_puesto, key=f"puesto_{id_}")
+                
                 if nuevo_puesto != puesto_actual:
                     st.session_state.plantel[id_]["puesto"] = nuevo_puesto
                     st.rerun()
@@ -188,10 +200,14 @@ elif st.session_state.pantalla_actual == "Plantel":
                     st.session_state.plantel[id_]["foto"] = foto_archivo
                     st.image(foto_archivo, width=120)
                 st.session_state.plantel[id_]["notas_actitud"] = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
-                st.session_state.plantel[id_]["notas_tecnicas"] = st.text_area("🏉 Notas Técnicas:", datos["notas_tecnicas"], key=f"tec_{id_}")
+                st.session_state.plantel[id_]["notas_tecnicas"] = st.text_area("🏉 Notas Técnicas (Pases/Tackles):", datos["notas_tecnicas"], key=f"tec_{id_}")
 
-# --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS (CORREGIDO DE RAÍZ) ---
+# --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS ---
 elif st.session_state.pantalla_actual == "Partidos":
+    if st.button("⬅️ Volver al Menú Principal", key="back_partidos"):
+        st.session_state.pantalla_actual = "Inicio"
+        st.rerun()
+        
     st.header("🏉 Carga de Partidos y Bloques")
     st.markdown("### 1. Datos del Encuentro")
     
@@ -208,19 +224,18 @@ elif st.session_state.pantalla_actual == "Partidos":
     
     llave_partido = f"{fecha_p_str}_{'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'}"
     
-    # Inicializar base de datos del partido si no existe
     if llave_partido not in st.session_state.partidos:
         st.session_state.partidos[llave_partido] = {
-            "rival": "",
-            "bloque": bloque_seleccionado,
+            "rival": "", "bloque": bloque_seleccionado,
             "convocados": {id_: False for id_ in st.session_state.plantel.keys()}
         }
     
     if rival_seleccionado != "Seleccionar rival...":
         st.session_state.partidos[llave_partido]["rival"] = rival_seleccionado
 
-    # [ELIMINADO EL BUCLE CONFLICTIVO DE ARRIBA]
-    # Ahora la sincronización se hace de manera natural usando la propiedad 'value' directa en cada checkbox individual
+    for id_ in st.session_state.plantel.keys():
+        clave_check_p = f"chk_partido_{id_}_{llave_partido}"
+        st.session_state[clave_check_p] = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
 
     st.write("---")
     
@@ -240,27 +255,14 @@ elif st.session_state.pantalla_actual == "Partidos":
             nombre_completo = f"{datos['apellido']} {datos['nombre']} ({datos['puesto']})"
             
             if buscar_p.lower() in nombre_completo.lower():
-                # Buscamos el estado guardado real en la base temporal
-                estado_real_partido = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
+                clave_check_p = f"chk_partido_{id_}_{llave_partido}"
+                check_p = st.checkbox(nombre_completo, value=st.session_state.partidos[llave_partido]["convocados"].get(id_, False), key=f"chk_p_visual_{id_}_{llave_partido}")
                 
-                # Control cruzado de bloques
-                otra_llave = f"{fecha_p_str}_{'Amarillo' if 'Azul' in bloque_seleccionado else 'Azul'}"
-                ya_juega_en_otro = False
-                if otra_llave in st.session_state.partidos:
-                    ya_juega_en_otro = st.session_state.partidos[otra_llave]["convocados"].get(id_, False)
-                
-                etiqueta = f"🏃‍♂️ {nombre_completo} ⚠️ (Ya está en el otro Bloque)" if ya_juega_en_otro else nombre_completo
-                
-                # [SOLUCIÓN DEFINITIVA] Checkbox usando 'value' directo conectado a la memoria, sin usar la propiedad 'key' dinámica que causaba el bucle
-                check_p = st.checkbox(etiqueta, value=estado_real_partido, key=f"chk_p_visual_{id_}_{llave_partido}")
-                
-                # Guardamos el cambio si el usuario interactúa
-                if check_p != estado_real_partido:
+                if check_p != st.session_state.partidos[llave_partido]["convocados"][id_]:
                     st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
-                    st.rerun() # Ahora este rerun sí funciona porque no hay llaves maestras pisándolo arriba
+                    st.rerun()
                 
-                if check_p:
-                    convocados_cont += 1
+                if check_p: convocados_cont += 1
 
         st.write(f"### 📈 Total Convocados {bloque_seleccionado}: {convocados_cont} chicos")
         if st.button("💾 GUARDAR CONVOCATORIA DE PARTIDO", key="btn_guardar_partido"):
@@ -271,7 +273,6 @@ elif st.session_state.pantalla_actual == "Partidos":
 
     with tab_placa:
         total_convocados_reales = sum(st.session_state.partidos[llave_partido]["convocados"].values())
-        
         if rival_seleccionado == "Seleccionar rival..." or total_convocados_reales == 0:
             st.warning("⚠️ Asegurate de seleccionar un rival arriba y tildar al menos un convocado en la otra pestaña.")
         else:
@@ -283,7 +284,6 @@ elif st.session_state.pantalla_actual == "Partidos":
                     fig, ax = plt.subplots(figsize=(8, 14), dpi=100)
                     ax.set_facecolor('#111111')
                     plt.tight_layout()
-                    
                     ax.set_xlim(0, 10)
                     ax.set_ylim(0, 20)
                     ax.axis('off')
@@ -291,34 +291,24 @@ elif st.session_state.pantalla_actual == "Partidos":
                     try:
                         escudo_img = plt.imread("escudo.png")
                         ax.imshow(escudo_img, extent=[4, 6, 17.5, 19.5], zorder=1)
-                    except:
-                        pass
+                    except: pass
 
-                    y_text = 17.2
-                    ax.text(5, y_text, f"CONVOCADOS M-13", color='#F4C430', fontsize=28, fontweight='bold', ha='center')
-                    
-                    y_text -= 0.8
+                    ax.text(5, 17.2, f"CONVOCADOS M-13", color='#F4C430', fontsize=28, fontweight='bold', ha='center')
                     bloque_texto = 'AZUL' if 'Azul' in bloque_seleccionado else 'AMARILLO'
-                    ax.text(5, y_text, f"TLTC {bloque_texto} vs {unidecode(rival_seleccionado).upper()}", color='white', fontsize=16, fontweight='bold', ha='center')
+                    ax.text(5, 16.4, f"TLTC {bloque_texto} vs {unidecode(rival_seleccionado).upper()}", color='white', fontsize=16, fontweight='bold', ha='center')
+                    ax.text(5, 15.9, f"📅 {fecha_p_str}", color='#AAAAAA', fontsize=11, ha='center')
                     
-                    y_text -= 0.5
-                    ax.text(5, y_text, f"📅 {fecha_p_str}", color='#AAAAAA', fontsize=11, ha='center')
-                    
-                    y_text -= 1.0
-                    
+                    y_text = 14.9
                     for puesto in LISTA_PUESTOS:
                         chicos_en_puesto = []
                         for id_jugador, convocado in st.session_state.partidos[llave_partido]["convocados"].items():
-                            if convocado:
-                                datos_chico = st.session_state.plantel[id_jugador]
-                                if datos_chico["puesto"] == puesto:
-                                    chicos_en_puesto.append(f"{unidecode(datos_chico['apellido']).upper()} {unidecode(datos_chico['nombre']).upper()}")
+                            if convocado and st.session_state.plantel[id_jugador]["puesto"] == puesto:
+                                chicos_en_puesto.append(f"{unidecode(st.session_state.plantel[id_jugador]['apellido']).upper()} {unidecode(st.session_state.plantel[id_jugador]['nombre']).upper()}")
                         
                         if chicos_en_puesto:
                             y_text -= 0.6
                             rect = patches.Rectangle((1, y_text - 0.2), 8, 0.6, facecolor='#2B3E75', edgecolor='#F4C430', linewidth=1.5, zorder=0)
                             ax.add_patch(rect)
-                            
                             ax.text(1.3, y_text + 0.1, f"{puesto.upper()}", color='#F4C430', fontsize=13, fontweight='bold', ha='left', va='center')
                             
                             y_text -= 0.5
@@ -339,15 +329,14 @@ elif st.session_state.pantalla_actual == "Partidos":
                     st.image(buf, caption=f"Placa Matchday vs {rival_seleccionado}", use_container_width=True)
                     
                     st.sidebar.markdown("### Descargar Placa")
-                    st.download_button(
-                        label="📥 DESCARGAR PLACA PARA WHATSAPP",
-                        data=buf,
-                        file_name=f"tltc_m13_matchday_{fecha_p_str}_{bloque_texto}.png",
-                        mime="image/png"
-                    )
+                    st.download_button(label="📥 DESCARGAR PLACA PARA WHATSAPP", data=buf, file_name=f"tltc_m13_matchday_{fecha_p_str}_{bloque_texto}.png", mime="image/png")
 
 # --- MÓDULO 4: ESTADÍSTICAS ---
 elif st.session_state.pantalla_actual == "Estadísticas":
+    if st.button("⬅️ Volver al Menú Principal", key="back_stats"):
+        st.session_state.pantalla_actual = "Inicio"
+        st.rerun()
+        
     st.header("📊 Estadísticas de Rendimiento")
     if st.session_state.asistencias:
         fechas = list(st.session_state.asistencias.keys())
