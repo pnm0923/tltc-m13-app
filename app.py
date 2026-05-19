@@ -219,9 +219,18 @@ elif st.session_state.pantalla_actual == "Plantel":
                 st.session_state.plantel[id_]["notas_actitud"] = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
                 st.session_state.plantel[id_]["notas_tecnicas"] = st.text_area("🏉 Notas Técnicas (Pases/Tackles):", datos["notas_tecnicas"], key=f"tec_{id_}")
 
+import io
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import matplotlib.patheffects as path_effects
+from unidecode import unidecode
+
+# [CORRECCIÓN/MEJORA] Lista de puestos en orden de juego
+ORDEN_PUESTOS = ["Sin Puesto", "Pilar", "Hooker", "2° Linea", "3° Linea", "Medio scrum", "Apertura", "Centro", "Wing", "Fullback"]
+
 # --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS ---
 elif st.session_state.pantalla_actual == "Partidos":
-    st.header("🏉 Carga de Partidos y Bloques")
+    st.header("🏉 Carga de Partidos y Convocatorias")
     st.markdown("### 1. Datos del Encuentro")
     
     lista_rivales = ["Seleccionar rival...", "Tucumán Rugby", "Universitario", "Jockey Club", "Cardenales", "Natación y Gimnasia", "Los Tarcos", "Lince", "Huirapuca", "Aguará Guazú", "San Martín/Liceo/Corsarios"]
@@ -237,14 +246,12 @@ elif st.session_state.pantalla_actual == "Partidos":
     
     llave_partido = f"{fecha_p_str}_{'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'}"
     
-    # Inicializar base de datos de partidos
     if llave_partido not in st.session_state.partidos:
         st.session_state.partidos[llave_partido] = {
             "rival": "",
             "bloque": bloque_seleccionado,
             "convocados": {id_: False for id_ in st.session_state.plantel.keys()}
         }
-    
     if rival_seleccionado != "Seleccionar rival...":
         st.session_state.partidos[llave_partido]["rival"] = rival_seleccionado
 
@@ -257,7 +264,6 @@ elif st.session_state.pantalla_actual == "Partidos":
         if st.button("❌ Limpiar Convocatoria de este Bloque", key="btn_limpiar_partido"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.partidos[llave_partido]["convocados"][id_] = False
-                # Limpiamos también la memoria visual del componente
                 st.session_state[f"chk_partido_{id_}_{llave_partido}"] = False
             st.rerun()
 
@@ -266,31 +272,21 @@ elif st.session_state.pantalla_actual == "Partidos":
         
         convocados_cont = 0
         for id_, datos in st.session_state.plantel.items():
+            # Mostramos el puesto también en la lista de partidos para guiarte
             nombre_completo = f"{datos['apellido']} {datos['nombre']} ({datos['puesto']})"
             
             if buscar_p.lower() in nombre_completo.lower():
                 clave_check_p = f"chk_partido_{id_}_{llave_partido}"
-                
-                # [PASO CLAVE] Traemos el estado real guardado en memoria para esta convocatoria
                 estado_guardado_p = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
                 
-                # Sincronizamos la memoria visual del componente antes de dibujarlo
-                if clave_check_p not in st.session_state:
-                    st.session_state[clave_check_p] = estado_guardado_p
+                # Sincronización visual estricta
+                st.session_state[clave_check_p] = estado_guardado_p
                 
-                # Control cruzado sutil de bloques
-                otra_llave = f"{fecha_p_str}_{'Amarillo' if 'Azul' in bloque_seleccionado else 'Azul'}"
-                ya_juega_en_otro = False
-                if otra_llave in st.session_state.partidos:
-                    ya_juega_en_otro = st.session_state.partidos[otra_llave]["convocados"].get(id_, False)
+                check_p = st.checkbox(nombre_completo, key=clave_check_p)
                 
-                etiqueta = f"🏃‍♂️ {nombre_completo} ⚠️ (Ya está en el otro Bloque)" if ya_juega_en_otro else nombre_completo
-                
-                # Dibujamos el checkbox controlado por st.session_state de forma estricta
-                check_p = st.checkbox(etiqueta, key=clave_check_p)
-                
-                # Si el tilde cambia con tu dedo, actualiza la base de datos interna de inmediato
-                st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
+                if check_p != st.session_state.partidos[llave_partido]["convocados"][id_]:
+                    st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
+                    st.rerun()
                 
                 if check_p:
                     convocados_cont += 1
@@ -303,34 +299,98 @@ elif st.session_state.pantalla_actual == "Partidos":
                 st.success(f"¡Partido vs. {rival_seleccionado} ({bloque_seleccionado}) guardado correctamente!")
 
     with tab_placa:
-        if rival_seleccionado == "Seleccionar rival...":
-            st.warning("⚠️ Seleccioná un rival en la parte superior para generar la placa visual.")
+        if rival_seleccionado == "Seleccionar rival..." or convocados_cont == 0:
+            st.warning("⚠️ Asegurate de tener un rival y al menos un convocado.")
         else:
-            # DIBUJO DE LA PLACA VISUAL
-            st.markdown(f"""
-            <div class="placa-convocados">
-                <div class="placa-titulo">CONVOCADOS M-13</div>
-                <div class="placa-sub">{bloque_seleccionado.upper()} vs {rival_seleccionado.upper()}</div>
-                <div style="color:#F4C430; font-size:12px; margin-bottom:20px;">📅 FECHA: {fecha_p_str}</div>
-            """, unsafe_allow_html=True)
-            
-            # Recorremos los puestos oficiales uno por uno para armar los subgrupos
-            for puesto in LISTA_PUESTOS:
-                chicos_en_puesto = []
-                for id_jugador, convocado in st.session_state.partidos[llave_partido]["convocados"].items():
-                    if convocado:
-                        datos_chico = st.session_state.plantel[id_jugador]
-                        if datos_chico["puesto"] == puesto:
-                            chicos_en_puesto.append(f"{datos_chico['apellido']} {datos_chico['nombre']}")
-                
-                # Si este puesto tiene jugadores convocados, lo imprimimos en la placa
-                if chicos_en_puesto:
-                    st.markdown(f'<div class="placa-puesto-header">{puesto}</div>', unsafe_allow_html=True)
-                    for chico in chicos_en_puesto:
-                        st.markdown(f'<div class="placa-jugador">• {chico}</div>', unsafe_allow_html=True)
+            # BOTÓN MÁGICO PARA GENERAR LA IMAGEN DESCARGABLE
+            if st.button("🖼️ GENERAR IMAGEN PROFESIONAL"):
+                with st.spinner("Dibujando la placa..."):
+                    # 1. Configuración de Matplotlib para el diseño
+                    plt.rcParams['font.family'] = 'sans-serif'
+                    plt.rcParams['font.size'] = 12
+                    
+                    # Definimos el canvas de la imagen (más alto que ancho, para celu)
+                    fig, ax = plt.subplots(figsize=(8, 14), dpi=100)
+                    ax.set_facecolor('#111111') # Fondo negro
+                    plt.tight_layout()
+                    
+                    # Eliminamos los ejes cartesianos
+                    ax.set_xlim(0, 10)
+                    ax.set_ylim(0, 20)
+                    ax.axis('off')
+                    
+                    # 2. Dibujamos la Cabecera (Escudo, Título y Rival)
+                    # Agregamos el escudo (si está en el repositorio)
+                    try:
+                        escudo_img = plt.imread("escudo.png")
+                        ax.imshow(escudo_img, extent=[4, 6, 17.5, 19.5], zorder=1)
+                    except:
+                        pass # Si no hay escudo, no dibuja nada
+
+                    # Título Oro
+                    y_text = 17.2
+                    ax.text(5, y_text, f"CONVOCADOS M-13", color='#F4C430', fontsize=30, fontweight='bold', ha='center')
+                    
+                    # Subtítulo (Bloque vs Rival)
+                    y_text -= 1.0
+                    bloque_texto = 'AZUL' if 'Azul' in bloque_seleccionado else 'AMARILLO'
+                    ax.text(5, y_text, f"TLTC {bloque_texto} vs {unidecode(rival_seleccionado).upper()}", color='white', fontsize=18, fontweight='bold', ha='center')
+                    
+                    # Fecha
+                    y_text -= 0.6
+                    ax.text(5, y_text, f"📅 {fecha_p_str}", color='#AAAAAA', fontsize=12, ha='center')
+                    
+                    y_text -= 1.0 # Espacio para la lista
+                    
+                    # 3. Dibujamos el Listado de Jugadores agrupado por puestos
+                    # Recorremos los puestos en orden oficial
+                    for puesto in ORDEN_PUESTOS:
+                        chicos_en_puesto = []
+                        for id_jugador, convocado in st.session_state.partidos[llave_partido]["convocados"].items():
+                            if convocado:
+                                datos_chico = st.session_state.plantel[id_jugador]
+                                if datos_chico["puesto"] == puesto:
+                                    chicos_en_puesto.append(f"{unidecode(datos_chico['apellido']).upper()} {unidecode(datos_chico['nombre']).upper()}")
                         
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.caption("📱 ¡Sacale una captura de pantalla desde tu Xiaomi para mandarla al grupo de WhatsApp!")
+                        # Si hay chicos en este puesto, dibujamos la sección
+                        if chicos_en_puesto:
+                            # Fondo para el header del puesto (Azul)
+                            y_text -= 0.6
+                            rect = patches.Rectangle((1, y_text - 0.2), 8, 0.6, facecolor='#2B3E75', edgecolor='#F4C430', linewidth=1.5, rx=0.2, ry=0.2, zorder=0)
+                            ax.add_patch(rect)
+                            
+                            # Texto del Header (Oro)
+                            ax.text(1.2, y_text + 0.1, f"{puesto.upper()}", color='#F4C430', fontsize=14, fontweight='bold', ha='left', va='center')
+                            
+                            y_text -= 0.6
+                            # Texto de los Jugadores (Blanco con efecto sombra para legibilidad)
+                            for chico in chicos_en_puesto:
+                                txt = ax.text(1.4, y_text, chico, color='white', fontsize=13, ha='left', va='center')
+                                txt.set_path_effects([path_effects.withStroke(linewidth=2, foreground='#000000')])
+                                y_text -= 0.4 # Espacio para el siguiente chico
+                                
+                    # 4. Dibujamos el Pie de Placa con la identidad del club
+                    y_text = 1.0
+                    ax.text(5, y_text, f"“RESPECTO • COMPAÑERISMO • PASIÓN” • TLTC", color='#AAAAAA', fontsize=12, ha='center')
+                    ax.text(5, 0.5, "🏉 Matchday Convocatoria 🏉", color='#F4C430', fontsize=10, ha='center')
+
+                    # 5. Guardamos la imagen en memoria (Buffer) para que no ocupe espacio físico
+                    buf = io.BytesIO()
+                    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.1)
+                    buf.seek(0)
+                    
+                    st.write("---")
+                    
+                    # 6. Mostramos la imagen final en el celular y activamos la descarga
+                    st.image(buf, caption=f"Placa Matchday vs {rival_seleccionado}", use_container_width=True)
+                    
+                    st.download_button(
+                        label="📥 DESCARGAR IMAGEN PARA WHATSAPP",
+                        data=buf,
+                        file_name=f"tltc_m13_matchday_{fecha_p_str}_{bloque_texto}.png",
+                        mime="image/png"
+                    )
+                    st.info("📱 Si no la descargás con el botón, podés mantener presionada la imagen y elegir 'Guardar imagen'.")
 
 # --- MÓDULO 4: ESTADÍSTICAS ---
 elif st.session_state.pantalla_actual == "Estadísticas":
