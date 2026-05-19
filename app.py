@@ -194,10 +194,103 @@ elif st.session_state.pantalla_actual == "Plantel":
                 st.session_state.plantel[id_]["notas_actitud"] = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
                 st.session_state.plantel[id_]["notas_tecnicas"] = st.text_area("🏉 Notas Técnicas (Pases/Tackles):", datos["notas_tecnicas"], key=f"tec_{id_}")
 
-# --- MÓDULO 3: PROXIMAMENTE PARTIDOS ---
+# --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS ---
 elif st.session_state.pantalla_actual == "Partidos":
-    st.header("🏉 Carga de Partidos y Minutos")
-    st.info("Módulo en desarrollo. Próximamente podrás cargar el rival de la fecha (Universitario, Huirapuca, etc.) y controlar el recambio equitativo de los chicos.")
+    st.header("🏉 Carga de Partidos y Bloques")
+    
+    # 1. Configuración del Partido de la Fecha
+    st.markdown("### 1. Datos del Encuentro")
+    
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        bloque_seleccionado = st.selectbox(
+            "Seleccionar Bloque del TLTC",
+            ["Tucumán Lawn Tennis Azul", "Tucumán Lawn Tennis Amarillo"],
+            key="sb_bloque"
+        )
+    with col_p2:
+        rival = st.text_input("Rival de la Fecha", placeholder="Ej: Universitario, Huirapuca...", key="ti_rival")
+        
+    fecha_partido = st.date_input("Fecha del Partido", datetime.date.today(), key="di_fecha_partido")
+    fecha_p_str = fecha_partido.strftime("%Y-%m-%d")
+    
+    # Estructura de base de datos para partidos en la memoria temporal
+    if 'partidos' not in st.session_state:
+        st.session_state.partidos = {}
+        
+    # Llave única que combina fecha y bloque para que no se pisen (Ej: "2026-05-23_Azul")
+    llave_partido = f"{fecha_p_str}_{'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'}"
+    
+    # Inicializar el partido si es nuevo
+    if llave_partido not in st.session_state.partidos:
+        st.session_state.partidos[llave_partido] = {
+            "rival": rival,
+            "bloque": bloque_seleccionado,
+            "convocados": {id_: False for id_ in st.session_state.plantel.keys()}
+        }
+    
+    # Si el usuario escribe el rival sobre la marcha, lo actualizamos en la memoria
+    if rival:
+        st.session_state.partidos[llave_partido]["rival"] = rival
+
+    st.write("---")
+    
+    # 2. Selección de Jugadores para este bloque
+    st.markdown(f"### 👥 Convocados para el Bloque: **{bloque_seleccionado}**")
+    st.caption("Tildá a los chicos que van a jugar en este bloque este fin de semana.")
+    
+    # Botón para limpiar rápido la lista de convocados
+    if st.button("❌ Limpiar Convocatoria de este Bloque", key="btn_limpiar_partido"):
+        for id_ in st.session_state.plantel.keys():
+            st.session_state.partidos[llave_partido]["convocados"][id_] = False
+            if f"chk_partido_{id_}_{llave_partido}" in st.session_state:
+                st.session_state[f"chk_partido_{id_}_{llave_partido}"] = False
+        st.rerun()
+
+    buscar_p = st.text_input("🔍 Buscar jugador para convocar...")
+    
+    st.write("---")
+    convocados_cont = 0
+    
+    # LISTADO DE JUGADORES
+    for id_, datos in st.session_state.plantel.items():
+        nombre_completo = f"{datos['apellido']} {datos['nombre']}"
+        
+        if buscar_p.lower() in nombre_completo.lower():
+            clave_check_p = f"chk_partido_{id_}_{llave_partido}"
+            
+            # Buscamos si ya está guardado como convocado en este partido
+            estado_guardado_p = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
+            
+            # Control cruzado sutil: Verificar si el chico ya está en el OTRO bloque para la misma fecha
+            otra_llave = f"{fecha_p_str}_{'Amarillo' if 'Azul' in bloque_seleccionado else 'Azul'}"
+            ya_juega_en_otro = False
+            if otra_llave in st.session_state.partidos:
+                ya_juega_en_otro = st.session_state.partidos[otra_llave]["convocados"].get(id_, False)
+            
+            # Dibujamos el checkbox. Si ya juega en el otro bloque, le agregamos un aviso al nombre
+            etiqueta = f"🏃‍♂️ {nombre_completo} ⚠️ (Ya está en el otro Bloque)" if ya_juega_en_otro else nombre_completo
+            
+            # Sincronizamos la interfaz
+            if clave_check_p not in st.session_state:
+                st.session_state[clave_check_p] = estado_guardado_p
+                
+            check_p = st.checkbox(etiqueta, key=clave_check_p)
+            
+            # Guardamos el tilde del entrenador
+            st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
+            
+            if check_p:
+                convocados_cont += 1
+
+    st.write("---")
+    st.write(f"### 📈 Total Convocados {bloque_seleccionado}: {convocados_cont} chicos")
+    
+    if st.button("💾 GUARDAR CONVOCATORIA DE PARTIDO", key="btn_guardar_partido"):
+        if not rival:
+            st.error("Por favor, escribí el nombre del rival antes de guardar.")
+        else:
+            st.success(f"¡Partido vs. {rival} ({bloque_seleccionado}) guardado correctamente!")
 
 # --- MÓDULO 4: PROXIMAMENTE ESTADÍSTICAS ---
 elif st.session_state.pantalla_actual == "Estadísticas":
