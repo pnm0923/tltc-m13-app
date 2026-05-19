@@ -171,14 +171,20 @@ elif st.session_state.pantalla_actual == "Asistencia":
     
     if st.button("💾 GUARDAR ENTRENAMIENTO EN LA NUBE", key="btn_guardar_asist"):
         with st.spinner("Sincronizando con Supabase..."):
+            # [SOLUCIÓN DEFINITIVA] Limpieza segura por ID individual e inserción nativa de resguardo
             filas_asistencia = []
             for id_ in st.session_state.plantel.keys():
                 val_presente = st.session_state.get(f"chk_asist_{id_}_{fecha_str}", False)
+                
+                # Borramos el registro exacto de este chico en esta fecha para limpiar la tabla
+                supabase.table("asistencias_entrenamiento").delete().eq("fecha", fecha_str).eq("jugador_id", str(id_)).execute()
+                
+                # Armamos la fila nueva
                 filas_asistencia.append({"fecha": fecha_str, "jugador_id": str(id_), "presente": val_presente})
             
-            # Al tener Clave Primaria Compuesta en la tabla, el upsert funciona de forma nativa directa
-            supabase.table("asistencias_entrenamiento").upsert(filas_asistencia).execute()
-            st.success("¡Asistencia guardada permanentemente en la nube!")
+            # Se inserta el lote limpio sin disparar reglas de conflicto
+            supabase.table("asistencias_entrenamiento").insert(filas_asistencia).execute()
+            st.success("¡Asistencia guardada permanentemente con éxito!")
 
 # --- MÓDULO 2: PLANTEL ACTUAL ---
 elif st.session_state.pantalla_actual == "Plantel":
@@ -207,15 +213,17 @@ elif st.session_state.pantalla_actual == "Plantel":
     st.write("---")
     if st.button("💾 GUARDAR MODIFICACIONES DEL PLANTEL", key="btn_guardar_fichas_nube"):
         with st.spinner("Sincronizando puestos y notas con la nube..."):
-            filas_plantel = []
             for id_, datos in st.session_state.plantel.items():
-                filas_plantel.append({
+                # Limpiamos el registro de la ficha para evitar rebotar por llaves duplicadas
+                supabase.table("datos_plantel").delete().eq("jugador_id", str(id_)).execute()
+                
+                supabase.table("datos_plantel").insert({
                     "jugador_id": str(id_), 
                     "puesto": datos["puesto"], 
                     "notas_actitud": datos["notas_actitud"], 
+                    "datos_plantel" if not datos["notas_tecnicas"] else datos["notas_tecnicas"]
                     "notas_tecnicas": datos["notas_tecnicas"]
-                })
-            supabase.table("datos_plantel").upsert(filas_plantel).execute()
+                }).execute()
             st.success("¡Todos los puestos y notas técnicas se guardaron correctamente!")
             st.rerun()
 
@@ -280,11 +288,15 @@ elif st.session_state.pantalla_actual == "Partidos":
                     filas_partidos = []
                     for id_ in st.session_state.plantel.keys():
                         val_convocado = st.session_state.get(f"chk_p_visual_{id_}_{llave_partido}", False)
+                        
+                        # Limpiamos el registro de este chico para este partido exacto
+                        supabase.table("convocados_partidos").delete().eq("fecha", fecha_p_str).eq("bloque", bloque_corto).eq("jugador_id", str(id_)).execute()
+                        
                         filas_partidos.append({
                             "fecha": fecha_p_str, "bloque": bloque_corto, "rival": rival_seleccionado,
                             "jugador_id": str(id_), "convocado": val_convocado
                         })
-                    supabase.table("convocados_partidos").upsert(filas_partidos).execute()
+                    supabase.table("convocados_partidos").insert(filas_partidos).execute()
                     st.success("¡Convocatoria guardada permanentemente!")
 
     with tab_placa:
@@ -294,40 +306,4 @@ elif st.session_state.pantalla_actual == "Partidos":
             st.warning("⚠️ Selecciona un rival y tilda convocados para generar la placa.")
         else:
             if st.button("🖼️ GENERAR PLACA COMPLETA"):
-                fig, ax = plt.subplots(figsize=(8, 14), dpi=100)
-                ax.set_facecolor('#111111'); ax.set_xlim(0, 10); ax.set_ylim(0, 20); ax.axis('off')
-                try: ax.imshow(plt.imread("escudo.png"), extent=[4, 6, 17.5, 19.5], zorder=1)
-                except: pass
-
-                ax.text(5, 17.2, "CONVOCADOS M-13", color='#F4C430', fontsize=28, fontweight='bold', ha='center')
-                ax.text(5, 16.4, f"TLTC {bloque_corto.upper()} vs {unidecode(rival_seleccionado).upper()}", color='white', fontsize=16, fontweight='bold', ha='center')
-                ax.text(5, 15.9, f"📅 {fecha_p_str}", color='#AAAAAA', fontsize=11, ha='center')
-                
-                y_text = 14.9
-                for puesto in LISTA_PUESTOS:
-                    chicos_en_puesto = []
-                    for id_ in st.session_state.plantel.keys():
-                        if st.session_state.get(f"chk_p_visual_{id_}_{llave_partido}", False) and st.session_state.plantel[id_]["puesto"] == puesto:
-                            chicos_en_puesto.append(f"{unidecode(st.session_state.plantel[id_]['apellido']).upper()} {unidecode(st.session_state.plantel[id_]['nombre']).upper()}")
-                    
-                    if chicos_en_puesto:
-                        y_text -= 0.6
-                        ax.add_patch(patches.Rectangle((1, y_text - 0.2), 8, 0.6, facecolor='#2B3E75', edgecolor='#F4C430', linewidth=1.5, zorder=0))
-                        ax.text(1.3, y_text + 0.1, f"{puesto.upper()}", color='#F4C430', fontsize=13, fontweight='bold', ha='left', va='center')
-                        y_text -= 0.5
-                        for chico in chicos_en_puesto:
-                            txt = ax.text(1.5, y_text, chico, color='white', fontsize=12, ha='left', va='center')
-                            txt.set_path_effects([path_effects.withStroke(linewidth=2, foreground='#000000')])
-                            y_text -= 0.4
-                            
-                ax.text(5, 1.0, f"“RESPETO • COMPAÑERISMO • PASIÓN” • TLTC", color='#AAAAAA', fontsize=11, ha='center')
-                buf = io.BytesIO(); plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.1); buf.seek(0); plt.close()
-                st.image(buf, use_container_width=True)
-                st.sidebar.download_button(label="📥 DESCARGAR PLACA", data=buf, file_name=f"convocados_{fecha_p_str}.png", mime="image/png")
-
-# --- MÓDULO 4: ESTADÍSTICAS ---
-elif st.session_state.pantalla_actual == "Estadísticas":
-    if st.button("⬅️ Volver al Menú Principal", key="back_stats"):
-        st.session_state.pantalla_actual = "Inicio"; st.rerun()
-    st.header("📊 Estadísticas de Rendimiento")
-    st.info("Módulo conectado a Supabase. Próximamente gráficos detallados de asistencia.")
+                fig, ax = plt.subplots(figsize=(8, 14), dpi=
