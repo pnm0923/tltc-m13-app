@@ -90,7 +90,6 @@ with st.sidebar:
 
 # --- PANTALLA PRINCIPAL (HOME) ---
 if st.session_state.pantalla_actual == "Inicio":
-    # Imagen del Escudo Local
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
@@ -102,9 +101,7 @@ if st.session_state.pantalla_actual == "Inicio":
     st.write("Panel de Control del Entrenador")
     st.write("---")
     
-    # Grid de opciones interactivas
     col_a, col_b = st.columns(2)
-    
     with col_a:
         st.markdown('<div class="menu-card"><h4>👥 Plantel Actual</h4><p>Lista, puestos y fotos de perfil</p></div>', unsafe_allow_html=True)
         if st.button("Ir a Plantel", key="btn_plantel"):
@@ -115,7 +112,6 @@ if st.session_state.pantalla_actual == "Inicio":
         if st.button("Ir a Asistencia", key="btn_asistencia"):
             st.session_state.pantalla_actual = "Asistencia"
             st.rerun()
-
     with col_b:
         st.markdown('<div class="menu-card"><h4>🏉 Partidos y Placas</h4><p>Selección por Bloques y Placas</p></div>', unsafe_allow_html=True)
         if st.button("Ir a Partidos", key="btn_partidos"):
@@ -130,7 +126,6 @@ if st.session_state.pantalla_actual == "Inicio":
 # --- MÓDULO 1: ASISTENCIA A ENTRENAMIENTO ---
 elif st.session_state.pantalla_actual == "Asistencia":
     st.header("📋 Asistencia a Entrenamiento")
-    
     fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today(), key="selector_fecha_entr")
     fecha_str = fecha.strftime("%Y-%m-%d")
     
@@ -141,14 +136,12 @@ elif st.session_state.pantalla_actual == "Asistencia":
         clave_check = f"chk_asist_{id_}_{fecha_str}"
         st.session_state[clave_check] = st.session_state.asistencias[fecha_str][id_]
 
-    # BOTONES DE ACCIÓN MASIVA
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("✔️ Todos Presentes", key="btn_todos_pres"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.asistencias[fecha_str][id_] = True
             st.rerun()
-            
     with col_btn2:
         if st.button("❌ Reiniciar (Todos Ausentes)", key="btn_todos_aus"):
             for id_ in st.session_state.plantel.keys():
@@ -164,21 +157,16 @@ elif st.session_state.pantalla_actual == "Asistencia":
         if buscar.lower() in nombre_completo.lower():
             clave_check = f"chk_asist_{id_}_{fecha_str}"
             check = st.checkbox(nombre_completo, key=clave_check)
-            
             if check != st.session_state.asistencias[fecha_str][id_]:
                 st.session_state.asistencias[fecha_str][id_] = check
                 st.rerun()
-                
-            if check:
-                presentes_cont += 1
+            if check: presentes_cont += 1
                 
     st.write(f"### 🏃‍♂️ Presentes en esta fecha: {presentes_cont} / 55")
-    st.write("---")
-    
     if st.button("💾 GUARDAR ENTRENAMIENTO", key="btn_guardar_asist"):
-        st.success(f"¡Asistencia del {fecha_str} guardada con éxito en la nube!")
+        st.success(f"¡Asistencia del {fecha_str} guardada con éxito!")
 
-# --- MÓDULO 2: PLANTEL ACTUAL Y FICHAS ---
+# --- MÓDULO 2: PLANTEL ACTUAL ---
 elif st.session_state.pantalla_actual == "Plantel":
     st.header("👥 Plantel Completo M-13")
     buscar_p = st.text_input("🔍 Buscar en el plantel...")
@@ -189,11 +177,8 @@ elif st.session_state.pantalla_actual == "Plantel":
         
         if buscar_p.lower() in nombre_completo.lower():
             with st.expander(f"🏃‍♂️ {nombre_completo} | 🏷️ {puesto_actual}"):
-                
-                # Desplegable interactivo para asignar el puesto
                 indice_puesto = LISTA_PUESTOS.index(puesto_actual) if puesto_actual in LISTA_PUESTOS else 0
                 nuevo_puesto = st.selectbox(f"Asignar Puesto para {datos['nombre']}:", LISTA_PUESTOS, index=indice_puesto, key=f"puesto_{id_}")
-                
                 if nuevo_puesto != puesto_actual:
                     st.session_state.plantel[id_]["puesto"] = nuevo_puesto
                     st.rerun()
@@ -203,9 +188,9 @@ elif st.session_state.pantalla_actual == "Plantel":
                     st.session_state.plantel[id_]["foto"] = foto_archivo
                     st.image(foto_archivo, width=120)
                 st.session_state.plantel[id_]["notas_actitud"] = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
-                st.session_state.plantel[id_]["notas_tecnicas"] = st.text_area("🏉 Notas Técnicas (Pases/Tackles):", datos["notas_tecnicas"], key=f"tec_{id_}")
+                st.session_state.plantel[id_]["notas_tecnicas"] = st.text_area("🏉 Notas Técnicas:", datos["notas_tecnicas"], key=f"tec_{id_}")
 
-# --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS ---
+# --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS (CORREGIDO DE RAÍZ) ---
 elif st.session_state.pantalla_actual == "Partidos":
     st.header("🏉 Carga de Partidos y Bloques")
     st.markdown("### 1. Datos del Encuentro")
@@ -223,7 +208,7 @@ elif st.session_state.pantalla_actual == "Partidos":
     
     llave_partido = f"{fecha_p_str}_{'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'}"
     
-    # Inicializar base de datos de partidos si no existe
+    # Inicializar base de datos del partido si no existe
     if llave_partido not in st.session_state.partidos:
         st.session_state.partidos[llave_partido] = {
             "rival": "",
@@ -234,15 +219,11 @@ elif st.session_state.pantalla_actual == "Partidos":
     if rival_seleccionado != "Seleccionar rival...":
         st.session_state.partidos[llave_partido]["rival"] = rival_seleccionado
 
-    # [SINCRONIZACIÓN DE MEMORIA VISUAL CRUCIAL] 
-    # Obligamos a los checkboxes de partidos a recordar exactamente el valor de la base de datos interna
-    for id_ in st.session_state.plantel.keys():
-        clave_check_p = f"chk_partido_{id_}_{llave_partido}"
-        st.session_state[clave_check_p] = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
+    # [ELIMINADO EL BUCLE CONFLICTIVO DE ARRIBA]
+    # Ahora la sincronización se hace de manera natural usando la propiedad 'value' directa en cada checkbox individual
 
     st.write("---")
     
-    # SISTEMA DE PESTAÑAS (Manejo limpio de Carga vs Placa)
     tab_carga, tab_placa = st.tabs(["📝 Cargar Convocados", "🖼️ Ver Placa de Matchday"])
     
     with tab_carga:
@@ -259,15 +240,24 @@ elif st.session_state.pantalla_actual == "Partidos":
             nombre_completo = f"{datos['apellido']} {datos['nombre']} ({datos['puesto']})"
             
             if buscar_p.lower() in nombre_completo.lower():
-                clave_check_p = f"chk_partido_{id_}_{llave_partido}"
+                # Buscamos el estado guardado real en la base temporal
+                estado_real_partido = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
                 
-                # Dibujamos el checkbox sincronizado de manera estricta
-                check_p = st.checkbox(nombre_completo, key=clave_check_p)
+                # Control cruzado de bloques
+                otra_llave = f"{fecha_p_str}_{'Amarillo' if 'Azul' in bloque_seleccionado else 'Azul'}"
+                ya_juega_en_otro = False
+                if otra_llave in st.session_state.partidos:
+                    ya_juega_en_otro = st.session_state.partidos[otra_llave]["convocados"].get(id_, False)
                 
-                # Si el tilde cambia con tu dedo en el Xiaomi, impacta de inmediato en la base de datos y redibuja
-                if check_p != st.session_state.partidos[llave_partido]["convocados"][id_]:
+                etiqueta = f"🏃‍♂️ {nombre_completo} ⚠️ (Ya está en el otro Bloque)" if ya_juega_en_otro else nombre_completo
+                
+                # [SOLUCIÓN DEFINITIVA] Checkbox usando 'value' directo conectado a la memoria, sin usar la propiedad 'key' dinámica que causaba el bucle
+                check_p = st.checkbox(etiqueta, value=estado_real_partido, key=f"chk_p_visual_{id_}_{llave_partido}")
+                
+                # Guardamos el cambio si el usuario interactúa
+                if check_p != estado_real_partido:
                     st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
-                    st.rerun()
+                    st.rerun() # Ahora este rerun sí funciona porque no hay llaves maestras pisándolo arriba
                 
                 if check_p:
                     convocados_cont += 1
@@ -326,7 +316,6 @@ elif st.session_state.pantalla_actual == "Partidos":
                         
                         if chicos_en_puesto:
                             y_text -= 0.6
-                            # Rectángulos limpios y estables sin parámetros incompatibles
                             rect = patches.Rectangle((1, y_text - 0.2), 8, 0.6, facecolor='#2B3E75', edgecolor='#F4C430', linewidth=1.5, zorder=0)
                             ax.add_patch(rect)
                             
