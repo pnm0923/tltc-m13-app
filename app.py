@@ -78,7 +78,7 @@ if 'plantel' not in st.session_state:
     try:
         res_plantel = supabase.table("datos_plantel").select("*").execute()
         for row in res_plantel.data:
-            j_id = row["jugador_id"]
+            j_id = str(row["jugador_id"])
             if j_id in st.session_state.plantel:
                 st.session_state.plantel[j_id]["puesto"] = row["puesto"]
                 st.session_state.plantel[j_id]["notas_actitud"] = row["notas_actitud"]
@@ -170,16 +170,16 @@ elif st.session_state.pantalla_actual == "Asistencia":
     st.write(f"### 🏃‍♂️ Presentes en esta fecha: {presentes_cont} / 55")
     
     if st.button("💾 GUARDAR ENTRENAMIENTO EN LA NUBE", key="btn_guardar_asist"):
-        with St.spinner("Subiendo datos a Supabase..."):
+        # [CORRECCIÓN EFECTUADA] Se cambió la 'S' mayúscula a minúscula en st.spinner para solucionar el NameError
+        with st.spinner("Subiendo datos a Supabase..."):
             for id_ in st.session_state.plantel.keys():
                 val_presente = st.session_state.get(f"chk_asist_{id_}_{fecha_str}", False)
-                # [SOLUCIÓN DEFINITIVA] Pasamos el nombre real de la regla única: 'fecha_jugador_unique'
                 supabase.table("asistencias_entrenamiento").upsert({
                     "fecha": fecha_str, "jugador_id": id_, "presente": val_presente
                 }, on_conflict="fecha_jugador_unique").execute()
             st.success("¡Asistencia guardada permanentemente en Supabase!")
 
-# --- MÓDULO 2: PLANTEL ACTUAL ---
+# --- MÓDULO 2: PLANTEL ACTUAL (MÓDULO SEGURO CON BOTÓN MÁSICO DE GUARDADO) ---
 elif st.session_state.pantalla_actual == "Plantel":
     if st.button("⬅️ Volver al Menú Principal", key="back_plantel"):
         st.session_state.pantalla_actual = "Inicio"; st.rerun()
@@ -194,22 +194,30 @@ elif st.session_state.pantalla_actual == "Plantel":
         if buscar_p.lower() in nombre_completo.lower():
             with st.expander(f"🏃‍♂️ {nombre_completo} | 🏷️ {puesto_actual}"):
                 indice_puesto = LISTA_PUESTOS.index(puesto_actual) if puesto_actual in LISTA_PUESTOS else 0
-                nuevo_puesto = st.selectbox(f"Asignar Puesto:", LISTA_PUESTOS, index=indice_puesto, key=f"puesto_{id_}")
                 
+                # Capturamos los cambios en variables locales de memoria sin usar rerun automático molesto
+                nuevo_puesto = st.selectbox(f"Asignar Puesto:", LISTA_PUESTOS, index=indice_puesto, key=f"puesto_{id_}")
                 nota_act = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
                 nota_tec = st.text_area("🏉 Notas Técnicas:", datos["notas_tecnicas"], key=f"tec_{id_}")
                 
-                if nuevo_puesto != puesto_actual or nota_act != datos["notas_actitud"] or nota_tec != datos["notas_tecnicas"]:
-                    st.session_state.plantel[id_]["puesto"] = nuevo_puesto
-                    st.session_state.plantel[id_]["notas_actitud"] = nota_act
-                    st.session_state.plantel[id_]["notas_tecnicas"] = nota_tec
-                    try:
-                        supabase.table("datos_plantel").upsert({
-                            "jugador_id": id_, "puesto": nuevo_puesto, "notas_actitud": nota_act, "notas_tecnicas": nota_tec
-                        }, on_conflict="jugador_id").execute()
-                    except:
-                        pass
-                    st.rerun()
+                # Actualizamos el estado temporal del plantel con lo que escribís en pantalla
+                st.session_state.plantel[id_]["puesto"] = nuevo_puesto
+                st.session_state.plantel[id_]["notas_actitud"] = nota_act
+                st.session_state.plantel[id_]["notas_tecnicas"] = nota_tec
+
+    st.write("---")
+    # Botón masivo para enviar los puestos y notas a Supabase de un solo toque
+    if st.button("💾 GUARDAR MODIFICACIONES DEL PLANTEL", key="btn_guardar_fichas_nube"):
+        with st.spinner("Sincronizando puestos y notas con Supabase..."):
+            for id_, datos in st.session_state.plantel.items():
+                supabase.table("datos_plantel").upsert({
+                    "jugador_id": str(id_), 
+                    "puesto": datos["puesto"], 
+                    "notas_actitud": datos["notas_actitud"], 
+                    "notas_tecnicas": datos["notas_tecnicas"]
+                }, on_conflict="jugador_id").execute()
+            st.success("¡Todos los puestos y notas técnicas se guardaron permanentemente en la nube!")
+            st.rerun()
 
 # --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS ---
 elif st.session_state.pantalla_actual == "Partidos":
@@ -272,7 +280,6 @@ elif st.session_state.pantalla_actual == "Partidos":
                 with st.spinner("Subiendo convocatoria..."):
                     for id_ in st.session_state.plantel.keys():
                         val_convocado = st.session_state.get(f"chk_p_visual_{id_}_{llave_partido}", False)
-                        # [SOLUCIÓN DEFINITIVA] Pasamos el nombre real de la regla única: 'fecha_bloque_jugador_unique'
                         supabase.table("convocados_partidos").upsert({
                             "fecha": fecha_p_str, "bloque": bloque_corto, "rival": rival_seleccionado,
                             "jugador_id": id_, "convocado": val_convocado
