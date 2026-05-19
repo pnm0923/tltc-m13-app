@@ -45,12 +45,12 @@ def init_supabase():
 try:
     supabase: Client = init_supabase()
 except Exception as e:
-    st.error("Error al conectar con la base de datos en la nube. Verifica los Secrets.")
+    st.error("Error al conectar con la base de datos. Verifica los Secrets.")
 
 # Lista de puestos oficiales
 LISTA_PUESTOS = ["Sin Puesto", "Pilar", "Hooker", "2° Linea", "3° Linea", "Medio scrum", "Apertura", "Centro", "Wing", "Fullback"]
 
-# BASE DE DATOS SEMILLA (Los 55 chicos de la M-13)
+# 2. BASE DE DATOS SEMILLA (Los 55 chicos de la M-13)
 if 'plantel' not in st.session_state:
     nombres_crudos = [
         "ARGAÑARAZ BAUTISTA", "BANEGAS MAXIMO", "BELLIDO IVO", "BERTINI ANTONIO", "BERTINI DIEGO",
@@ -70,9 +70,21 @@ if 'plantel' not in st.session_state:
         str(i+1): {
             "apellido": nombre.split()[0], "nombre": " ".join(nombre.split()[1:]),
             "nacimiento": datetime.date(2013, 1, 1), "puesto": "Sin Puesto", "foto": None,
-            "notas_tecnicas": "Sin observaciones técnicas.", "notas_actitud": "Buena predisposición en el club."
+            "notas_tecnicas": "", "notas_actitud": ""
         } for i, nombre in enumerate(nombres_crudos)
     }
+
+    # Cargar Puestos y Notas guardados en Supabase al iniciar la app
+    try:
+        res_plantel = supabase.table("datos_plantel").select("*").execute()
+        for row in res_plantel.data:
+            j_id = row["jugador_id"]
+            if j_id in st.session_state.plantel:
+                st.session_state.plantel[j_id]["puesto"] = row["puesto"]
+                st.session_state.plantel[j_id]["notas_actitud"] = row["notas_actitud"]
+                st.session_state.plantel[j_id]["notas_tecnicas"] = row["notas_tecnicas"]
+    except:
+        pass
 
 if 'pantalla_actual' not in st.session_state:
     st.session_state.pantalla_actual = "Inicio"
@@ -106,7 +118,7 @@ if st.session_state.pantalla_actual == "Inicio":
         if st.button("Ir a Estadísticas", key="btn_stats"):
             st.session_state.pantalla_actual = "Estadísticas"; st.rerun()
 
-# --- MÓDULO 1: ASISTENCIA A ENTRENAMIENTO ---
+# --- MÓDULO 1: ASISTENCIA A ENTRENAMIENTO (SOLUCIÓN HISTÓRICA APLICADA) ---
 elif st.session_state.pantalla_actual == "Asistencia":
     if st.button("⬅️ Volver al Menú Principal", key="back_asist"):
         st.session_state.pantalla_actual = "Inicio"; st.rerun()
@@ -115,7 +127,7 @@ elif st.session_state.pantalla_actual == "Asistencia":
     fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today(), key="selector_fecha_entr")
     fecha_str = fecha.strftime("%Y-%m-%d")
     
-    # Intentar descargar datos existentes de la nube para esa fecha
+    # 1. Control estricto de memoria para evitar conflictos con la nube al dibujar
     if f"loaded_asist_{fecha_str}" not in st.session_state:
         try:
             res = supabase.table("asistencias_entrenamiento").select("*").eq("fecha", fecha_str).execute()
@@ -126,14 +138,17 @@ elif st.session_state.pantalla_actual == "Asistencia":
         except:
             for id_ in st.session_state.plantel.keys(): st.session_state[f"chk_asist_{id_}_{fecha_str}"] = False
 
+    # 2. Botones de acción masiva fijando st.session_state de forma directa (Solución validada)
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("✔️ Todos Presentes", key="btn_todos_pres"):
-            for id_ in st.session_state.plantel.keys(): st.session_state[f"chk_asist_{id_}_{fecha_str}"] = True
+            for id_ in st.session_state.plantel.keys():
+                st.session_state[f"chk_asist_{id_}_{fecha_str}"] = True
             st.rerun()
     with col_btn2:
         if st.button("❌ Reiniciar (Todos Ausentes)", key="btn_todos_aus"):
-            for id_ in st.session_state.plantel.keys(): st.session_state[f"chk_asist_{id_}_{fecha_str}"] = False
+            for id_ in st.session_state.plantel.keys():
+                st.session_state[f"chk_asist_{id_}_{fecha_str}"] = False
             st.rerun()
             
     buscar = st.text_input("🔍 Buscar jugador en esta fecha...")
@@ -141,25 +156,26 @@ elif st.session_state.pantalla_actual == "Asistencia":
     
     presentes_cont = 0
     for id_, datos in st.session_state.plantel.items():
-        nombre_completo = f"{datos['apellido']} {datos['nombre']}"
+        nombre_completo = f"{datos['apellido']} {datos['nombre']} ({datos['puesto']})"
         if buscar.lower() in nombre_completo.lower():
             clave_check = f"chk_asist_{id_}_{fecha_str}"
+            
+            # Dibujamos el checkbox usando el estado real de la sesión sin value duplicado
             check = st.checkbox(nombre_completo, key=clave_check)
             if check: presentes_cont += 1
                 
     st.write(f"### 🏃‍♂️ Presentes en esta fecha: {presentes_cont} / 55")
     
     if st.button("💾 GUARDAR ENTRENAMIENTO EN LA NUBE", key="btn_guardar_asist"):
-        with st.spinner("Subiendo datos..."):
+        with st.spinner("Subiendo datos a Supabase..."):
             for id_ in st.session_state.plantel.keys():
                 val_presente = st.session_state.get(f"chk_asist_{id_}_{fecha_str}", False)
-                # Guarda o actualiza (upsert) en Supabase
                 supabase.table("asistencias_entrenamiento").upsert({
                     "fecha": fecha_str, "jugador_id": id_, "presente": val_presente
                 }, on_conflict="fecha,jugador_id").execute()
-            st.success("¡Asistencia guardada permanentemente en la nube!")
+            st.success("¡Asistencia guardada permanentemente en Supabase!")
 
-# --- MÓDULO 2: PLANTEL ACTUAL Y FICHAS ---
+# --- MÓDULO 2: PLANTEL ACTUAL (AHORA CON GUARDADO FIJO EN NUBE) ---
 elif st.session_state.pantalla_actual == "Plantel":
     if st.button("⬅️ Volver al Menú Principal", key="back_plantel"):
         st.session_state.pantalla_actual = "Inicio"; st.rerun()
@@ -175,12 +191,23 @@ elif st.session_state.pantalla_actual == "Plantel":
             with st.expander(f"🏃‍♂️ {nombre_completo} | 🏷️ {puesto_actual}"):
                 indice_puesto = LISTA_PUESTOS.index(puesto_actual) if puesto_actual in LISTA_PUESTOS else 0
                 nuevo_puesto = st.selectbox(f"Asignar Puesto:", LISTA_PUESTOS, index=indice_puesto, key=f"puesto_{id_}")
-                if nuevo_puesto != puesto_actual:
-                    st.session_state.plantel[id_]["puesto"] = nuevo_puesto; st.rerun()
                 
-                foto_archivo = st.file_uploader(f"Foto de Perfil", type=["jpg", "png", "jpeg"], key=f"foto_{id_}")
-                st.session_state.plantel[id_]["notas_actitud"] = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
-                st.session_state.plantel[id_]["notas_tecnicas"] = st.text_area("🏉 Notas Técnicas:", datos["notas_tecnicas"], key=f"tec_{id_}")
+                # Campos de notas de texto
+                nota_act = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
+                nota_tec = st.text_area("🏉 Notas Técnicas:", datos["notas_tecnicas"], key=f"tec_{id_}")
+                
+                # Guardar cambios individuales de la ficha en la nube al instante
+                if nuevo_puesto != puesto_actual or nota_act != datos["notas_actitud"] or nota_tec != datos["notas_tecnicas"]:
+                    st.session_state.plantel[id_]["puesto"] = nuevo_puesto
+                    st.session_state.plantel[id_]["notas_actitud"] = nota_act
+                    st.session_state.plantel[id_]["notas_tecnicas"] = nota_tec
+                    try:
+                        supabase.table("datos_plantel").upsert({
+                            "jugador_id": id_, "puesto": nuevo_puesto, "notas_actitud": nota_act, "notas_tecnicas": nota_tec
+                        }, on_conflict="jugador_id").execute()
+                    except:
+                        pass
+                    st.rerun()
 
 # --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS ---
 elif st.session_state.pantalla_actual == "Partidos":
@@ -198,7 +225,6 @@ elif st.session_state.pantalla_actual == "Partidos":
     fecha_p_str = fecha_partido.strftime("%Y-%m-%d")
     bloque_corto = 'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'
     
-    # Intentar descargar convocatoria existente de la nube
     if f"loaded_partido_{fecha_p_str}_{bloque_corto}" not in st.session_state:
         try:
             res = supabase.table("convocados_partidos").select("*").eq("fecha", fecha_p_str).eq("bloque", bloque_corto).execute()
@@ -231,7 +257,7 @@ elif st.session_state.pantalla_actual == "Partidos":
         if st.button("💾 GUARDAR PARTIDO EN LA NUBE", key="btn_guardar_partido"):
             if rival_seleccionado == "Seleccionar rival...": st.error("Por favor, elegí un rival.")
             else:
-                with st.spinner("Subiendo a la nube..."):
+                with st.spinner("Subiendo convocatoria..."):
                     for id_ in st.session_state.plantel.keys():
                         val_convocado = st.session_state.get(f"chk_p_visual_{id_}_{fecha_p_str}_{bloque_corto}", False)
                         supabase.table("convocados_partidos").upsert({
@@ -281,4 +307,4 @@ elif st.session_state.pantalla_actual == "Estadísticas":
     if st.button("⬅️ Volver al Menú Principal", key="back_stats"):
         st.session_state.pantalla_actual = "Inicio"; st.rerun()
     st.header("📊 Estadísticas de Rendimiento")
-    st.info("Módulo conectado a la base de datos en la nube. Próximamente gráficos detallados de asistencia de todo el año.")
+    st.info("Módulo conectado a Supabase. Próximamente gráficos detallados de asistencia.")
