@@ -50,7 +50,7 @@ except Exception as e:
 # Lista de puestos oficiales
 LISTA_PUESTOS = ["Sin Puesto", "Pilar", "Hooker", "2° Linea", "3° Linea", "Medio scrum", "Apertura", "Centro", "Wing", "Fullback"]
 
-# 2. BASE DE DATOS SEMILLA (Los 55 chicos de la M-13)
+# BASE DE DATOS SEMILLA (Los 55 chicos de la M-13)
 if 'plantel' not in st.session_state:
     nombres_crudos = [
         "ARGAÑARAZ BAUTISTA", "BANEGAS MAXIMO", "BELLIDO IVO", "BERTINI ANTONIO", "BERTINI DIEGO",
@@ -118,7 +118,7 @@ if st.session_state.pantalla_actual == "Inicio":
         if st.button("Ir a Estadísticas", key="btn_stats"):
             st.session_state.pantalla_actual = "Estadísticas"; st.rerun()
 
-# --- MÓDULO 1: ASISTENCIA A ENTRENAMIENTO (SOLUCIÓN HISTÓRICA APLICADA) ---
+# --- MÓDULO 1: ASISTENCIA A ENTRENAMIENTO ---
 elif st.session_state.pantalla_actual == "Asistencia":
     if st.button("⬅️ Volver al Menú Principal", key="back_asist"):
         st.session_state.pantalla_actual = "Inicio"; st.rerun()
@@ -127,18 +127,17 @@ elif st.session_state.pantalla_actual == "Asistencia":
     fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today(), key="selector_fecha_entr")
     fecha_str = fecha.strftime("%Y-%m-%d")
     
-    # 1. Control estricto de memoria para evitar conflictos con la nube al dibujar
-    if f"loaded_asist_{fecha_str}" not in st.session_state:
+    # [LOGICA BLINDADA] Descargar desde la nube SOLO UNA VEZ al cambiar de fecha
+    if f"last_loaded_date" not in st.session_state or st.session_state.last_loaded_date != fecha_str:
         try:
             res = supabase.table("asistencias_entrenamiento").select("*").eq("fecha", fecha_str).execute()
             mapa_nube = {row["jugador_id"]: row["presente"] for row in res.data}
             for id_ in st.session_state.plantel.keys():
                 st.session_state[f"chk_asist_{id_}_{fecha_str}"] = mapa_nube.get(id_, False)
-            st.session_state[f"loaded_asist_{fecha_str}"] = True
         except:
             for id_ in st.session_state.plantel.keys(): st.session_state[f"chk_asist_{id_}_{fecha_str}"] = False
+        st.session_state.last_loaded_date = fecha_str
 
-    # 2. Botones de acción masiva fijando st.session_state de forma directa (Solución validada)
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("✔️ Todos Presentes", key="btn_todos_pres"):
@@ -156,13 +155,22 @@ elif st.session_state.pantalla_actual == "Asistencia":
     
     presentes_cont = 0
     for id_, datos in st.session_state.plantel.items():
-        nombre_completo = f"{datos['apellido']} {datos['nombre']} ({datos['puesto']})"
-        if buscar.lower() in nombre_completo.lower():
-            clave_check = f"chk_asist_{id_}_{fecha_str}"
+        nombre_completo = f"{datos['apellido']} {datos['nombre']}"
+        clave_check = f"chk_asist_{id_}_{fecha_str}"
+        
+        # Inicializar llave por las dudas
+        if clave_check not in st.session_state:
+            st.session_state[clave_check] = False
             
-            # Dibujamos el checkbox usando el estado real de la sesión sin value duplicado
+        if buscar.lower() in nombre_completo.lower():
+            # Dibujamos de forma limpia. Sin el 'value' que causaba el conflicto técnico.
             check = st.checkbox(nombre_completo, key=clave_check)
-            if check: presentes_cont += 1
+            if st.session_state[clave_check]: 
+                presentes_cont += 1
+        else:
+            # Si está oculto por el buscador pero tildado, también suma
+            if st.session_state[clave_check]: 
+                presentes_cont += 1
                 
     st.write(f"### 🏃‍♂️ Presentes en esta fecha: {presentes_cont} / 55")
     
@@ -175,7 +183,7 @@ elif st.session_state.pantalla_actual == "Asistencia":
                 }, on_conflict="fecha,jugador_id").execute()
             st.success("¡Asistencia guardada permanentemente en Supabase!")
 
-# --- MÓDULO 2: PLANTEL ACTUAL (AHORA CON GUARDADO FIJO EN NUBE) ---
+# --- MÓDULO 2: PLANTEL ACTUAL ---
 elif st.session_state.pantalla_actual == "Plantel":
     if st.button("⬅️ Volver al Menú Principal", key="back_plantel"):
         st.session_state.pantalla_actual = "Inicio"; st.rerun()
@@ -192,11 +200,9 @@ elif st.session_state.pantalla_actual == "Plantel":
                 indice_puesto = LISTA_PUESTOS.index(puesto_actual) if puesto_actual in LISTA_PUESTOS else 0
                 nuevo_puesto = st.selectbox(f"Asignar Puesto:", LISTA_PUESTOS, index=indice_puesto, key=f"puesto_{id_}")
                 
-                # Campos de notas de texto
                 nota_act = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
                 nota_tec = st.text_area("🏉 Notas Técnicas:", datos["notas_tecnicas"], key=f"tec_{id_}")
                 
-                # Guardar cambios individuales de la ficha en la nube al instante
                 if nuevo_puesto != puesto_actual or nota_act != datos["notas_actitud"] or nota_tec != datos["notas_tecnicas"]:
                     st.session_state.plantel[id_]["puesto"] = nuevo_puesto
                     st.session_state.plantel[id_]["notas_actitud"] = nota_act
@@ -224,23 +230,26 @@ elif st.session_state.pantalla_actual == "Partidos":
     fecha_partido = st.date_input("Fecha del Partido", datetime.date.today(), key="di_fecha_partido")
     fecha_p_str = fecha_partido.strftime("%Y-%m-%d")
     bloque_corto = 'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'
+    llave_partido = f"{fecha_p_str}_{bloque_corto}"
     
-    if f"loaded_partido_{fecha_p_str}_{bloque_corto}" not in st.session_state:
+    # [LOGICA BLINDADA] Descargar desde la nube SOLO UNA VEZ al cambiar de partido/bloque
+    if f"last_loaded_match" not in st.session_state or st.session_state.last_loaded_match != llave_partido:
         try:
             res = supabase.table("convocados_partidos").select("*").eq("fecha", fecha_p_str).eq("bloque", bloque_corto).execute()
             mapa_partido_nube = {row["jugador_id"]: row["convocado"] for row in res.data}
             for id_ in st.session_state.plantel.keys():
-                st.session_state[f"chk_p_visual_{id_}_{fecha_p_str}_{bloque_corto}"] = mapa_partido_nube.get(id_, False)
-            st.session_state[f"loaded_partido_{fecha_p_str}_{bloque_corto}"] = True
+                st.session_state[f"chk_p_visual_{id_}_{llave_partido}"] = mapa_partido_nube.get(id_, False)
         except:
-            for id_ in st.session_state.plantel.keys(): st.session_state[f"chk_p_visual_{id_}_{fecha_p_str}_{bloque_corto}"] = False
+            for id_ in st.session_state.plantel.keys(): st.session_state[f"chk_p_visual_{id_}_{llave_partido}"] = False
+        st.session_state.last_loaded_match = llave_partido
 
     st.write("---")
     tab_carga, tab_placa = st.tabs(["📝 Cargar Convocados", "🖼️ Ver Placa de Matchday"])
     
     with tab_carga:
         if st.button("❌ Limpiar Convocatoria", key="btn_limpiar_partido"):
-            for id_ in st.session_state.plantel.keys(): st.session_state[f"chk_p_visual_{id_}_{fecha_p_str}_{bloque_corto}"] = False
+            for id_ in st.session_state.plantel.keys(): 
+                st.session_state[f"chk_p_visual_{id_}_{llave_partido}"] = False
             st.rerun()
 
         buscar_p = st.text_input("🔍 Buscar jugador para convocar...")
@@ -249,9 +258,19 @@ elif st.session_state.pantalla_actual == "Partidos":
         convocados_cont = 0
         for id_, datos in st.session_state.plantel.items():
             nombre_completo = f"{datos['apellido']} {datos['nombre']} ({datos['puesto']})"
+            clave_check_p = f"chk_p_visual_{id_}_{llave_partido}"
+            
+            if clave_check_p not in st.session_state:
+                st.session_state[clave_check_p] = False
+                
             if buscar_p.lower() in nombre_completo.lower():
-                check_p = st.checkbox(nombre_completo, key=f"chk_p_visual_{id_}_{fecha_p_str}_{bloque_corto}")
-                if check_p: convocados_cont += 1
+                # Dibujamos de forma limpia e independiente
+                check_p = st.checkbox(nombre_completo, key=clave_check_p)
+                if st.session_state[clave_check_p]: 
+                    convocados_cont += 1
+            else:
+                if st.session_state[clave_check_p]: 
+                    convocados_cont += 1
 
         st.write(f"### 📈 Total Convocados: {convocados_cont} chicos")
         if st.button("💾 GUARDAR PARTIDO EN LA NUBE", key="btn_guardar_partido"):
@@ -259,7 +278,7 @@ elif st.session_state.pantalla_actual == "Partidos":
             else:
                 with st.spinner("Subiendo convocatoria..."):
                     for id_ in st.session_state.plantel.keys():
-                        val_convocado = st.session_state.get(f"chk_p_visual_{id_}_{fecha_p_str}_{bloque_corto}", False)
+                        val_convocado = st.session_state.get(f"chk_p_visual_{id_}_{llave_partido}", False)
                         supabase.table("convocados_partidos").upsert({
                             "fecha": fecha_p_str, "bloque": bloque_corto, "rival": rival_seleccionado,
                             "jugador_id": id_, "convocado": val_convocado
@@ -267,7 +286,10 @@ elif st.session_state.pantalla_actual == "Partidos":
                 st.success("¡Convocatoria guardada permanentemente en la nube!")
 
     with tab_placa:
-        if rival_seleccionado == "Seleccionar rival..." or convocados_cont == 0:
+        # Contamos cuántas opciones están realmente tildadas en memoria
+        total_tildados_placa = sum([st.session_state.get(f"chk_p_visual_{id_}_{llave_partido}", False) for id_ in st.session_state.plantel.keys()])
+        
+        if rival_seleccionado == "Seleccionar rival..." or total_tildados_placa == 0:
             st.warning("⚠️ Selecciona un rival y tilda convocados para generar la placa.")
         else:
             if st.button("🖼️ GENERAR PLACA COMPLETA"):
@@ -284,7 +306,7 @@ elif st.session_state.pantalla_actual == "Partidos":
                 for puesto in LISTA_PUESTOS:
                     chicos_en_puesto = []
                     for id_ in st.session_state.plantel.keys():
-                        if st.session_state.get(f"chk_p_visual_{id_}_{fecha_p_str}_{bloque_corto}", False) and st.session_state.plantel[id_]["puesto"] == puesto:
+                        if st.session_state.get(f"chk_p_visual_{id_}_{llave_partido}", False) and st.session_state.plantel[id_]["puesto"] == puesto:
                             chicos_en_puesto.append(f"{unidecode(st.session_state.plantel[id_]['apellido']).upper()} {unidecode(st.session_state.plantel[id_]['nombre']).upper()}")
                     
                     if chicos_en_puesto:
