@@ -237,6 +237,7 @@ elif st.session_state.pantalla_actual == "Partidos":
     
     llave_partido = f"{fecha_p_str}_{'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'}"
     
+    # Inicializar base de datos de partidos
     if llave_partido not in st.session_state.partidos:
         st.session_state.partidos[llave_partido] = {
             "rival": "",
@@ -256,6 +257,8 @@ elif st.session_state.pantalla_actual == "Partidos":
         if st.button("❌ Limpiar Convocatoria de este Bloque", key="btn_limpiar_partido"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.partidos[llave_partido]["convocados"][id_] = False
+                # Limpiamos también la memoria visual del componente
+                st.session_state[f"chk_partido_{id_}_{llave_partido}"] = False
             st.rerun()
 
         buscar_p = st.text_input("🔍 Buscar jugador para convocar...")
@@ -263,13 +266,19 @@ elif st.session_state.pantalla_actual == "Partidos":
         
         convocados_cont = 0
         for id_, datos in st.session_state.plantel.items():
-            # Mostramos el puesto también en la lista de partidos para guiarte
             nombre_completo = f"{datos['apellido']} {datos['nombre']} ({datos['puesto']})"
             
             if buscar_p.lower() in nombre_completo.lower():
                 clave_check_p = f"chk_partido_{id_}_{llave_partido}"
+                
+                # [PASO CLAVE] Traemos el estado real guardado en memoria para esta convocatoria
                 estado_guardado_p = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
                 
+                # Sincronizamos la memoria visual del componente antes de dibujarlo
+                if clave_check_p not in st.session_state:
+                    st.session_state[clave_check_p] = estado_guardado_p
+                
+                # Control cruzado sutil de bloques
                 otra_llave = f"{fecha_p_str}_{'Amarillo' if 'Azul' in bloque_seleccionado else 'Azul'}"
                 ya_juega_en_otro = False
                 if otra_llave in st.session_state.partidos:
@@ -277,12 +286,11 @@ elif st.session_state.pantalla_actual == "Partidos":
                 
                 etiqueta = f"🏃‍♂️ {nombre_completo} ⚠️ (Ya está en el otro Bloque)" if ya_juega_en_otro else nombre_completo
                 
-                st.session_state[clave_check_p] = estado_guardado_p
+                # Dibujamos el checkbox controlado por st.session_state de forma estricta
                 check_p = st.checkbox(etiqueta, key=clave_check_p)
                 
-                if check_p != st.session_state.partidos[llave_partido]["convocados"][id_]:
-                    st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
-                    st.rerun()
+                # Si el tilde cambia con tu dedo, actualiza la base de datos interna de inmediato
+                st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
                 
                 if check_p:
                     convocados_cont += 1
