@@ -121,20 +121,31 @@ if st.session_state.pantalla_actual == "Inicio":
 elif st.session_state.pantalla_actual == "Asistencia":
     st.header("📋 Asistencia a Entrenamiento")
     
-    fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today())
+    # 1. Selector de fecha (Si cambias la fecha, la app se actualiza sola)
+    fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today(), key="selector_fecha_entr")
     fecha_str = fecha.strftime("%Y-%m-%d")
     
-    # Inicializar fecha si no existe en los datos
+    # CONTROL DE ESTADOS DE SESIÓN (Unificación de base de datos y memoria visual)
     if fecha_str not in st.session_state.asistencias:
+        # Si es una fecha NUEVA, arranca limpia en falso
         st.session_state.asistencias[fecha_str] = {id_: False for id_ in st.session_state.plantel.keys()}
-    
-    # BOTONES DE ACCIÓN MASIVA (Corregidos para forzar el tilde visual)
+        # Forzamos a la memoria visual a limpiarse para esta nueva fecha
+        for id_ in st.session_state.plantel.keys():
+            st.session_state[f"chk_asist_{id_}_{fecha_str}"] = False
+    else:
+        # SI LA FECHA YA EXISTÍA (HISTORIAL/EDICIÓN):
+        # Aseguramos que los checkboxes recuerden lo que guardaste antes
+        for id_ in st.session_state.plantel.keys():
+            clave_check = f"chk_asist_{id_}_{fecha_str}"
+            if clave_check not in st.session_state:
+                st.session_state[clave_check] = st.session_state.asistencias[fecha_str][id_]
+
+    # BOTONES DE ACCIÓN MASIVA
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("✔️ Todos Presentes", key="btn_todos_pres"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.asistencias[fecha_str][id_] = True
-                # Esto obliga al componente visual a ponerse en True
                 st.session_state[f"chk_asist_{id_}_{fecha_str}"] = True
             st.rerun()
             
@@ -142,42 +153,36 @@ elif st.session_state.pantalla_actual == "Asistencia":
         if st.button("❌ Reiniciar (Todos Ausentes)", key="btn_todos_aus"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.asistencias[fecha_str][id_] = False
-                # Esto obliga al componente visual a ponerse en False
-                st.session_state[f"chk_asist_{id_}_{fecha_str}"] = True  # Al cambiar la base, reiniciamos el control
-                if f"chk_asist_{id_}_{fecha_str}" in st.session_state:
-                    st.session_state[f"chk_asist_{id_}_{fecha_str}"] = False
+                st.session_state[f"chk_asist_{id_}_{fecha_str}"] = False
             st.rerun()
             
-    buscar = st.text_input("🔍 Buscar jugador para asistencia...")
+    buscar = st.text_input("🔍 Buscar jugador en esta fecha...")
     st.write("---")
     
     presentes_cont = 0
     
-    # LISTADO INTERACTIVO
+    # LISTADO INTERACTIVO DE ASISTENCIA
     for id_, datos in st.session_state.plantel.items():
         nombre_completo = f"{datos['apellido']} {datos['nombre']}"
         if buscar.lower() in nombre_completo.lower():
-            # Clave única para la memoria visual del componente
             clave_check = f"chk_asist_{id_}_{fecha_str}"
             
-            # Sincronizamos la memoria visual con la base de datos interna si no estaba creada
-            if clave_check not in st.session_state:
-                st.session_state[clave_check] = st.session_state.asistencias[fecha_str].get(id_, False)
-            
-            # Dibujamos el checkbox usando el estado controlado por la sesión
+            # Dibujamos el checkbox controlado
             check = st.checkbox(nombre_completo, key=clave_check)
             
-            # Guardamos el cambio que hagas con el dedo en tu Xiaomi hacia la base de datos
+            # Guardamos cualquier edición manual que hagas en el momento
             st.session_state.asistencias[fecha_str][id_] = check
                 
             if check:
                 presentes_cont += 1
                 
-    st.write(f"### 🏃‍♂️ Presentes en cancha: {presentes_cont} / 55")
+    st.write(f"### 🏃‍♂️ Presentes en esta fecha: {presentes_cont} / 55")
     st.write("---")
     
-    if st.button("💾 GUARDAR ENTRENAMIENTO", key="btn_guardar_asist"):
-        st.success(f"¡Asistencia del {fecha_str} guardada con éxito en la nube!")
+    # Botón dinámico (Cambia el texto si estás editando o creando de cero)
+    texto_boton = "💾 GUARDAR CAMBIOS / CORRECCIONES" if presentes_cont > 0 else "💾 GUARDAR ENTRENAMIENTO"
+    if st.button(texto_boton, key="btn_guardar_asist"):
+        st.success(f"¡Datos del {fecha_str} actualizados y guardados correctamente!")
 
 # --- MÓDULO 2: PLANTEL ACTUAL Y FICHAS ---
 elif st.session_state.pantalla_actual == "Plantel":
