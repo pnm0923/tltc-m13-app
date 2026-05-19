@@ -223,7 +223,7 @@ elif st.session_state.pantalla_actual == "Partidos":
     
     llave_partido = f"{fecha_p_str}_{'Azul' if 'Azul' in bloque_seleccionado else 'Amarillo'}"
     
-    # Inicializar base de datos de partidos
+    # Inicializar base de datos de partidos si no existe
     if llave_partido not in st.session_state.partidos:
         st.session_state.partidos[llave_partido] = {
             "rival": "",
@@ -233,6 +233,12 @@ elif st.session_state.pantalla_actual == "Partidos":
     
     if rival_seleccionado != "Seleccionar rival...":
         st.session_state.partidos[llave_partido]["rival"] = rival_seleccionado
+
+    # [SINCRONIZACIÓN DE MEMORIA VISUAL CRUCIAL] 
+    # Obligamos a los checkboxes de partidos a recordar exactamente el valor de la base de datos interna
+    for id_ in st.session_state.plantel.keys():
+        clave_check_p = f"chk_partido_{id_}_{llave_partido}"
+        st.session_state[clave_check_p] = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
 
     st.write("---")
     
@@ -254,11 +260,11 @@ elif st.session_state.pantalla_actual == "Partidos":
             
             if buscar_p.lower() in nombre_completo.lower():
                 clave_check_p = f"chk_partido_{id_}_{llave_partido}"
-                estado_guardado_p = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
                 
-                st.session_state[clave_check_p] = estado_guardado_p
+                # Dibujamos el checkbox sincronizado de manera estricta
                 check_p = st.checkbox(nombre_completo, key=clave_check_p)
                 
+                # Si el tilde cambia con tu dedo en el Xiaomi, impacta de inmediato en la base de datos y redibuja
                 if check_p != st.session_state.partidos[llave_partido]["convocados"][id_]:
                     st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
                     st.rerun()
@@ -320,7 +326,7 @@ elif st.session_state.pantalla_actual == "Partidos":
                         
                         if chicos_en_puesto:
                             y_text -= 0.6
-                            # [CORRECCIÓN EFECTIVA] Eliminados rx y ry para evitar el AttributeError
+                            # Rectángulos limpios y estables sin parámetros incompatibles
                             rect = patches.Rectangle((1, y_text - 0.2), 8, 0.6, facecolor='#2B3E75', edgecolor='#F4C430', linewidth=1.5, zorder=0)
                             ax.add_patch(rect)
                             
