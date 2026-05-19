@@ -50,7 +50,7 @@ if 'plantel' not in st.session_state:
         "BUENO RISCO LISANDRO", "CANO PAOLETTI SALVADOR", "CARRASCO IGNACIO", "CISNEROS POSSE MAXIMO",
         "CORONEL BLAS", "CORONEL STEFANO", "CORROTO RODRIGO", "CRIPOVICH JUAN IGNACIO", "CRUZADO BAUTISTA",
         "DEL TOSO BENJAMÍN", "FERNANDEZ CORREA JUAN MARTIN", "FERNANDEZ FELIPE IGNACIO", "GARCIA COLLADOS MAXIMO",
-        "GIBILISCO MATEO", "GIJON BENJAMIN", "GUARDIA GERONIMO", HERRERA BENJAMIN", "INGARAMO BAUTISTA",
+        "GIBILISCO MATEO", "GIJON BENJAMIN", "GUARDIA GERONIMO", "HERRERA BENJAMIN", "INGARAMO BAUTISTA",
         "JUAREZ COLLADO LUCAS", "LIZARRAGA PALACIOS BAUTISTA", "LOBO HERRERA VICENTE", "MAIZEL FACUNDO",
         "MARIGLIANO LORENZO", "MARQUESTO MARTIN", "MEJAIL FRANCISCO", "MOLINA FRANCISCO", "MOROF MAXIMILANO",
         "NELLA CASTRO ANTONIO", "NORES PONDAL LORENZO", "ORTIZ FELIPE", "PALAVECINO JOAQUIN", "PEIRO JUAN PABLO",
@@ -80,6 +80,13 @@ if 'partidos' not in st.session_state:
 # Gestión de pantallas mediante Estado de Sesión
 if 'pantalla_actual' not in st.session_state:
     st.session_state.pantalla_actual = "Inicio"
+
+# Menú de navegación lateral (Solo por resguardo técnico)
+with st.sidebar:
+    st.markdown("### Menú de Navegación")
+    if st.button("🏠 Volver al Inicio", key="btn_nav_sidebar"):
+        st.session_state.pantalla_actual = "Inicio"
+        st.rerun()
 
 # --- PANTALLA PRINCIPAL (HOME) ---
 if st.session_state.pantalla_actual == "Inicio":
@@ -122,7 +129,6 @@ if st.session_state.pantalla_actual == "Inicio":
 
 # --- MÓDULO 1: ASISTENCIA A ENTRENAMIENTO ---
 elif st.session_state.pantalla_actual == "Asistencia":
-    # Botón de regreso directo en la interfaz central
     if st.button("⬅️ Volver al Menú Principal", key="back_asist"):
         st.session_state.pantalla_actual = "Inicio"
         st.rerun()
@@ -233,6 +239,7 @@ elif st.session_state.pantalla_actual == "Partidos":
     if rival_seleccionado != "Seleccionar rival...":
         st.session_state.partidos[llave_partido]["rival"] = rival_seleccionado
 
+    # Sincronización visual controlada para el listado de partidos
     for id_ in st.session_state.plantel.keys():
         clave_check_p = f"chk_partido_{id_}_{llave_partido}"
         st.session_state[clave_check_p] = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
