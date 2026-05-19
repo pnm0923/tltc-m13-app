@@ -170,21 +170,18 @@ elif st.session_state.pantalla_actual == "Asistencia":
     st.write(f"### 🏃‍♂️ Presentes en esta fecha: {presentes_cont} / 55")
     
     if st.button("💾 GUARDAR ENTRENAMIENTO EN LA NUBE", key="btn_guardar_asist"):
-        with st.spinner("Sincronizando con la nube de Supabase..."):
-            # Borrado previo limpio de la fecha seleccionada para evitar conflictos
-            supabase.table("asistencias_entrenamiento").delete().eq("fecha", fecha_str).execute()
-            
+        with st.spinner("Sincronizando con Supabase..."):
+            # [ELIMINACIÓN ABSOLUTA DE DELETE] Hacemos un upsert limpio y directo de toda la lista
             filas_asistencia = []
             for id_ in st.session_state.plantel.keys():
                 val_presente = st.session_state.get(f"chk_asist_{id_}_{fecha_str}", False)
-                if val_presente:
-                    filas_asistencia.append({"fecha": fecha_str, "jugador_id": str(id_), "presente": True})
+                filas_asistencia.append({"fecha": fecha_str, "jugador_id": str(id_), "presente": val_presente})
             
-            if filas_asistencia:
-                supabase.table("asistencias_entrenamiento").insert(filas_asistencia).execute()
+            # Se ejecuta de forma nativa por lote sin on_conflict problemáticos
+            supabase.table("asistencias_entrenamiento").upsert(filas_asistencia).execute()
             st.success("¡Asistencia guardada permanentemente con éxito!")
 
-# --- MÓDULO 2: PLANTEL ACTUAL (LINEA CORREGIDA) ---
+# --- MÓDULO 2: PLANTEL ACTUAL ---
 elif st.session_state.pantalla_actual == "Plantel":
     if st.button("⬅️ Volver al Menú Principal", key="back_plantel"):
         st.session_state.pantalla_actual = "Inicio"; st.rerun()
@@ -192,7 +189,6 @@ elif st.session_state.pantalla_actual == "Plantel":
     st.header("👥 Plantel Completo M-13")
     buscar_p = st.text_input("🔍 Buscar en el plantel...")
     
-    # [LÍNEA 157 CORREGIDA TOTALMENTE] 
     for id_, datos in st.session_state.plantel.items():
         nombre_completo = f"{datos['apellido']}, {datos['nombre']}"
         puesto_actual = datos.get("puesto", "Sin Puesto")
@@ -212,13 +208,15 @@ elif st.session_state.pantalla_actual == "Plantel":
     st.write("---")
     if st.button("💾 GUARDAR MODIFICACIONES DEL PLANTEL", key="btn_guardar_fichas_nube"):
         with st.spinner("Sincronizando puestos y notas con la nube..."):
+            filas_plantel = []
             for id_, datos in st.session_state.plantel.items():
-                supabase.table("datos_plantel").upsert({
+                filas_plantel.append({
                     "jugador_id": str(id_), 
                     "puesto": datos["puesto"], 
                     "notas_actitud": datos["notas_actitud"], 
                     "notas_tecnicas": datos["notas_tecnicas"]
-                }).execute()
+                })
+            supabase.table("datos_plantel").upsert(filas_plantel).execute()
             st.success("¡Todos los puestos y notas técnicas se guardaron correctamente!")
             st.rerun()
 
@@ -280,18 +278,14 @@ elif st.session_state.pantalla_actual == "Partidos":
             if rival_seleccionado == "Seleccionar rival...": st.error("Por favor, elegí un rival.")
             else:
                 with st.spinner("Subiendo lista de convocados..."):
-                    supabase.table("convocados_partidos").delete().eq("fecha", fecha_p_str).eq("bloque", bloque_corto).execute()
-                    
                     filas_partidos = []
                     for id_ in st.session_state.plantel.keys():
                         val_convocado = st.session_state.get(f"chk_p_visual_{id_}_{llave_partido}", False)
-                        if val_convocado:
-                            filas_partidos.append({
-                                "fecha": fecha_p_str, "bloque": bloque_corto, "rival": rival_seleccionado,
-                                "jugador_id": str(id_), "convocado": True
-                            })
-                    if filas_partidos:
-                        supabase.table("convocados_partidos").insert(filas_partidos).execute()
+                        filas_partidos.append({
+                            "fecha": fecha_p_str, "bloque": bloque_corto, "rival": rival_seleccionado,
+                            "jugador_id": str(id_), "convocado": val_convocado
+                        })
+                    supabase.table("convocados_partidos").upsert(filas_partidos).execute()
                     st.success("¡Convocatoria guardada permanentemente!")
 
     with tab_placa:
