@@ -121,24 +121,19 @@ if st.session_state.pantalla_actual == "Inicio":
 elif st.session_state.pantalla_actual == "Asistencia":
     st.header("📋 Asistencia a Entrenamiento")
     
-    # 1. Selector de fecha (Si cambias la fecha, la app se actualiza sola)
+    # 1. Selector de fecha
     fecha = st.date_input("Fecha del Entrenamiento", datetime.date.today(), key="selector_fecha_entr")
     fecha_str = fecha.strftime("%Y-%m-%d")
     
-    # CONTROL DE ESTADOS DE SESIÓN (Unificación de base de datos y memoria visual)
+    # [CORRECCIÓN CRUCIAL] Inicializar la base de datos de asistencia SOLO si realmente no existe NADA guardado para ese día
     if fecha_str not in st.session_state.asistencias:
-        # Si es una fecha NUEVA, arranca limpia en falso
         st.session_state.asistencias[fecha_str] = {id_: False for id_ in st.session_state.plantel.keys()}
-        # Forzamos a la memoria visual a limpiarse para esta nueva fecha
-        for id_ in st.session_state.plantel.keys():
-            st.session_state[f"chk_asist_{id_}_{fecha_str}"] = False
-    else:
-        # SI LA FECHA YA EXISTÍA (HISTORIAL/EDICIÓN):
-        # Aseguramos que los checkboxes recuerden lo que guardaste antes
-        for id_ in st.session_state.plantel.keys():
-            clave_check = f"chk_asist_{id_}_{fecha_str}"
-            if clave_check not in st.session_state:
-                st.session_state[clave_check] = st.session_state.asistencias[fecha_str][id_]
+
+    # Sincronizar la memoria visual de los checkboxes con lo que realmente hay en la base de datos de esa fecha
+    for id_ in st.session_state.plantel.keys():
+        clave_check = f"chk_asist_{id_}_{fecha_str}"
+        # Forzamos a que el componente visual tenga EXACTAMENTE el mismo valor que guardaste en la asistencia
+        st.session_state[clave_check] = st.session_state.asistencias[fecha_str][id_]
 
     # BOTONES DE ACCIÓN MASIVA
     col_btn1, col_btn2 = st.columns(2)
@@ -146,14 +141,12 @@ elif st.session_state.pantalla_actual == "Asistencia":
         if st.button("✔️ Todos Presentes", key="btn_todos_pres"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.asistencias[fecha_str][id_] = True
-                st.session_state[f"chk_asist_{id_}_{fecha_str}"] = True
             st.rerun()
             
     with col_btn2:
         if st.button("❌ Reiniciar (Todos Ausentes)", key="btn_todos_aus"):
             for id_ in st.session_state.plantel.keys():
                 st.session_state.asistencias[fecha_str][id_] = False
-                st.session_state[f"chk_asist_{id_}_{fecha_str}"] = False
             st.rerun()
             
     buscar = st.text_input("🔍 Buscar jugador en esta fecha...")
@@ -167,11 +160,13 @@ elif st.session_state.pantalla_actual == "Asistencia":
         if buscar.lower() in nombre_completo.lower():
             clave_check = f"chk_asist_{id_}_{fecha_str}"
             
-            # Dibujamos el checkbox controlado
+            # Dibujamos el checkbox
             check = st.checkbox(nombre_completo, key=clave_check)
             
-            # Guardamos cualquier edición manual que hagas en el momento
-            st.session_state.asistencias[fecha_str][id_] = check
+            # Si el entrenador cambia el tilde con el dedo en el Xiaomi, impacta directo en la base de datos
+            if check != st.session_state.asistencias[fecha_str][id_]:
+                st.session_state.asistencias[fecha_str][id_] = check
+                st.rerun()
                 
             if check:
                 presentes_cont += 1
@@ -179,10 +174,8 @@ elif st.session_state.pantalla_actual == "Asistencia":
     st.write(f"### 🏃‍♂️ Presentes en esta fecha: {presentes_cont} / 55")
     st.write("---")
     
-    # Botón dinámico (Cambia el texto si estás editando o creando de cero)
-    texto_boton = "💾 GUARDAR CAMBIOS / CORRECCIONES" if presentes_cont > 0 else "💾 GUARDAR ENTRENAMIENTO"
-    if st.button(texto_boton, key="btn_guardar_asist"):
-        st.success(f"¡Datos del {fecha_str} actualizados y guardados correctamente!")
+    if st.button("💾 GUARDAR ENTRENAMIENTO", key="btn_guardar_asist"):
+        st.success(f"¡Asistencia del {fecha_str} guardada con éxito en la nube!")
 
 # --- MÓDULO 2: PLANTEL ACTUAL Y FICHAS ---
 elif st.session_state.pantalla_actual == "Plantel":
