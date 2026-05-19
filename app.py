@@ -62,14 +62,14 @@ if 'plantel' not in st.session_state:
     ]
     st.session_state.plantel = {
         str(i+1): {
-            "apellido": nombre.split()[0],
-            "nombre": " ".join(nombre.split()[1:]),
+            "apellido": name.split()[0],
+            "nombre": " ".join(name.split()[1:]),
             "nacimiento": datetime.date(2013, 1, 1),
             "puesto": "Sin Puesto",
             "foto": None,
             "notas_tecnicas": "Sin observaciones técnicas.",
             "notas_actitud": "Buena predisposición en el club."
-        } for i, nombre in enumerate(nombres_crudos)
+        } for i, name in enumerate(nombres_crudos)
     }
 
 if 'asistencias' not in st.session_state:
@@ -91,7 +91,6 @@ with st.sidebar:
 
 # --- PANTALLA PRINCIPAL (HOME) ---
 if st.session_state.pantalla_actual == "Inicio":
-    # Imagen del Escudo Local
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
@@ -103,9 +102,7 @@ if st.session_state.pantalla_actual == "Inicio":
     st.write("Panel de Control del Entrenador")
     st.write("---")
     
-    # Grid de opciones interactivas
     col_a, col_b = st.columns(2)
-    
     with col_a:
         st.markdown('<div class="menu-card"><h4>👥 Plantel Actual</h4><p>Lista, puestos y fotos de perfil</p></div>', unsafe_allow_html=True)
         if st.button("Ir a Plantel", key="btn_plantel"):
@@ -205,7 +202,7 @@ elif st.session_state.pantalla_actual == "Plantel":
                 st.session_state.plantel[id_]["notas_actitud"] = st.text_area("🌟 Notas Actitudinales:", datos["notas_actitud"], key=f"act_{id_}")
                 st.session_state.plantel[id_]["notas_tecnicas"] = st.text_area("🏉 Notas Técnicas (Pases/Tackles):", datos["notas_tecnicas"], key=f"tec_{id_}")
 
-# --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS (FLUJO SÓLIDO SIN TABS) ---
+# --- MÓDULO 3: PARTIDOS Y CONVOCATORIAS (FLUJO TOTALMENTE CORREGIDO) ---
 elif st.session_state.pantalla_actual == "Partidos":
     st.header("🏉 Carga de Partidos y Convocatorias")
     st.markdown("### 1. Datos del Encuentro")
@@ -228,7 +225,7 @@ elif st.session_state.pantalla_actual == "Partidos":
         st.session_state.partidos[llave_partido] = {
             "rival": "",
             "bloque": bloque_seleccionado,
-            "mostrar_placa": False, # Control de visualización de imagen
+            "mostrar_placa": False,
             "convocados": {id_: False for id_ in st.session_state.plantel.keys()}
         }
     
@@ -238,11 +235,8 @@ elif st.session_state.pantalla_actual == "Partidos":
     st.write("---")
     st.markdown("### 👥 2. Seleccionar Convocados")
     
-    # Sincronización visual forzada (Igual que en Asistencia)
-    for id_ in st.session_state.plantel.keys():
-        clave_check_p = f"chk_partido_{id_}_{llave_partido}"
-        st.session_state[clave_check_p] = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
-
+    # [LA SOLUCIÓN ORIGINAL] Vinculamos el componente directamente al diccionario del partido
+    # Eliminamos el st.session_state secundario que generaba el parpadeo y borrado de tilde
     if st.button("❌ Limpiar Convocatoria de este Bloque", key="btn_limpiar_partido"):
         for id_ in st.session_state.plantel.keys():
             st.session_state.partidos[llave_partido]["convocados"][id_] = False
@@ -257,8 +251,6 @@ elif st.session_state.pantalla_actual == "Partidos":
         nombre_completo = f"{datos['apellido']} {datos['nombre']} ({datos['puesto']})"
         
         if buscar_p.lower() in nombre_completo.lower():
-            clave_check_p = f"chk_partido_{id_}_{llave_partido}"
-            
             # Control de bloques cruzados sutil
             otra_llave = f"{fecha_p_str}_{'Amarillo' if 'Azul' in bloque_seleccionado else 'Azul'}"
             ya_juega_en_otro = False
@@ -267,10 +259,14 @@ elif st.session_state.pantalla_actual == "Partidos":
             
             etiqueta = f"🏃‍♂️ {nombre_completo} ⚠️ (Ya está en el otro Bloque)" if ya_juega_en_otro else nombre_completo
             
-            check_p = st.checkbox(etiqueta, key=clave_check_p)
+            # Buscamos el valor real guardado directamente en la base temporal
+            valor_actual_partido = st.session_state.partidos[llave_partido]["convocados"].get(id_, False)
             
-            # Si el entrenador toca la pantalla, se guarda al instante sin perder foco
-            if check_p != st.session_state.partidos[llave_partido]["convocados"][id_]:
+            # Dibujamos el checkbox usando ÚNICAMENTE el mapa del partido (sin claves visuales que se pisen)
+            check_p = st.checkbox(etiqueta, value=valor_actual_partido, key=f"chk_p_directo_{id_}_{llave_partido}")
+            
+            # Si el tilde cambia en tu Xiaomi, actualiza de inmediato el mapa real
+            if check_p != valor_actual_partido:
                 st.session_state.partidos[llave_partido]["convocados"][id_] = check_p
                 st.rerun()
             
@@ -280,7 +276,7 @@ elif st.session_state.pantalla_actual == "Partidos":
     st.write(f"### 📈 Total Convocados: {convocados_cont} chicos")
     st.write("---")
     
-    # 3. GUARDADO Y DISPARO DE IMAGEN
+    # 3. GUARDADO Y GENERACIÓN DE IMAGEN
     if st.button("💾 GUARDAR CONVOCATORIA Y GENERAR PLACA IMAGEN", key="btn_guardar_partido"):
         if rival_seleccionado == "Seleccionar rival...":
             st.error("Por favor, elegí un rival de la lista antes de guardar.")
@@ -291,7 +287,7 @@ elif st.session_state.pantalla_actual == "Partidos":
             st.success(f"¡Convocatoria vs. {rival_seleccionado} guardada con éxito!")
 
     # Si se presionó guardar con éxito, dibujamos la placa abajo
-    if st.session_state.partidos[llave_partido].get("mostrar_placa", False):
+    if st.session_state.partidos[llave_partido].get("mostrar_placa", False) and convocados_cont > 0:
         st.write("---")
         st.markdown("### 🖼️ Placa de Matchday Generada")
         
