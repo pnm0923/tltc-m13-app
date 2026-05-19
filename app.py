@@ -201,6 +201,21 @@ elif st.session_state.pantalla_actual == "Partidos":
     # 1. Configuración del Partido de la Fecha
     st.markdown("### 1. Datos del Encuentro")
     
+    # Lista oficial de rivales de la URT provista por el entrenador
+    lista_rivales = [
+        "Seleccionar rival...",
+        "Tucumán Rugby",
+        "Universitario",
+        "Jockey Club",
+        "Cardenales",
+        "Natación y Gimnasia",
+        "Los Tarcos",
+        "Lince",
+        "Huirapuca",
+        "Aguará Guazú",
+        "San Martín/Liceo/Corsarios"
+    ]
+    
     col_p1, col_p2 = st.columns(2)
     with col_p1:
         bloque_seleccionado = st.selectbox(
@@ -209,7 +224,12 @@ elif st.session_state.pantalla_actual == "Partidos":
             key="sb_bloque"
         )
     with col_p2:
-        rival = st.text_input("Rival de la Fecha", placeholder="Ej: Universitario, Huirapuca...", key="ti_rival")
+        # Reemplazamos el text_input por un combobox (selectbox)
+        rival_seleccionado = st.selectbox(
+            "Rival de la Fecha",
+            lista_rivales,
+            key="sb_rival"
+        )
         
     fecha_partido = st.date_input("Fecha del Partido", datetime.date.today(), key="di_fecha_partido")
     fecha_p_str = fecha_partido.strftime("%Y-%m-%d")
@@ -224,14 +244,14 @@ elif st.session_state.pantalla_actual == "Partidos":
     # Inicializar el partido si es nuevo
     if llave_partido not in st.session_state.partidos:
         st.session_state.partidos[llave_partido] = {
-            "rival": rival,
+            "rival": "",
             "bloque": bloque_seleccionado,
             "convocados": {id_: False for id_ in st.session_state.plantel.keys()}
         }
     
-    # Si el usuario escribe el rival sobre la marcha, lo actualizamos en la memoria
-    if rival:
-        st.session_state.partidos[llave_partido]["rival"] = rival
+    # Guardamos el rival seleccionado si no es la opción por defecto
+    if rival_seleccionado != "Seleccionar rival...":
+        st.session_state.partidos[llave_partido]["rival"] = rival_seleccionado
 
     st.write("---")
     
@@ -287,10 +307,10 @@ elif st.session_state.pantalla_actual == "Partidos":
     st.write(f"### 📈 Total Convocados {bloque_seleccionado}: {convocados_cont} chicos")
     
     if st.button("💾 GUARDAR CONVOCATORIA DE PARTIDO", key="btn_guardar_partido"):
-        if not rival:
-            st.error("Por favor, escribí el nombre del rival antes de guardar.")
+        if rival_seleccionado == "Seleccionar rival...":
+            st.error("Por favor, elegí un rival de la lista antes de guardar.")
         else:
-            st.success(f"¡Partido vs. {rival} ({bloque_seleccionado}) guardado correctamente!")
+            st.success(f"¡Partido vs. {rival_seleccionado} ({bloque_seleccionado}) guardado correctamente!")
 
 # --- MÓDULO 4: PROXIMAMENTE ESTADÍSTICAS ---
 elif st.session_state.pantalla_actual == "Estadísticas":
