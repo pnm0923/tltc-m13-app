@@ -1,5 +1,6 @@
 streamlit
+supabase
 pandas
 matplotlib
-unidecode
-supabase
+Pillow
+requests
