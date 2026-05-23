@@ -75,10 +75,26 @@ def cargar_imagen_desde_url(url):
     except:
         return None
 
+@st.cache_resource
+def cargar_avatar_base():
+    """Carga avatar_jugador.png una sola vez y recorta del pecho hacia arriba (mitad superior)."""
+    try:
+        avatar = Image.open("avatar_jugador.png").convert("RGB")
+        w, h = avatar.size
+        # Recortar solo la mitad superior (pecho hacia arriba)
+        recorte = avatar.crop((0, 0, w, h // 2))
+        return recorte
+    except:
+        return None
+
 def crear_avatar(numero, size=150):
-    img = Image.new("RGB", (size, size), color=(30, 30, 30))
+    """Devuelve el avatar del jugador recortado y redimensionado al tamaño pedido."""
+    base = cargar_avatar_base()
+    if base:
+        return base.resize((size, size), Image.LANCZOS)
+    # Fallback si no encuentra el archivo
+    img = Image.new("RGB", (size, size), color=(43, 62, 117))
     draw = ImageDraw.Draw(img)
-    draw.ellipse([6, 6, size-6, size-6], fill=(43, 62, 117), outline=(244, 196, 48), width=4)
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", size=52)
     except:
