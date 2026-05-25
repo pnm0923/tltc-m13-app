@@ -166,11 +166,11 @@ def generar_placa(convocados_ids, bloque_nombre, rival, fecha_str):
         cx, cy = W // 2, escudo_y + escudo_size // 2
         draw.ellipse([cx-50, cy-50, cx+50, cy+50], fill=AZUL, outline=AMARILLO, width=3)
 
-    titulo = "TUCKÁN LAWN TENNIS CLUB"
+    titulo = "TUCUMAN LAWN TENNIS CLUB"
     bb = draw.textbbox((0,0), titulo, font=font_title)
     draw.text(((W-(bb[2]-bb[0]))//2, escudo_y+escudo_size+6), titulo, fill=AMARILLO, font=font_title)
 
-    sub = f"{bloque_nombre}  vs  {rival}  —  {fecha_str}"
+    sub = f"{bloque_nombre}  vs  {rival}  -  {fecha_str}"
     bb2 = draw.textbbox((0,0), sub, font=font_small)
     draw.text(((W-(bb2[2]-bb2[0]))//2, escudo_y+escudo_size+40), sub, fill=GRIS, font=font_small)
     draw.line([(30, HEADER_H-8), (W-30, HEADER_H-8)], fill=AMARILLO, width=2)
