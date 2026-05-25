@@ -105,7 +105,7 @@ def crear_avatar(numero, size=150):
     draw.text(((size-tw)/2, (size-th)/2 - 4), text, fill=(244, 196, 48), font=font)
     return img
 
-def generar_placa(titulares_ids, suplentes_ids, bloque_nombre, rival, fecha_str):
+def generar_placa(convocados_ids, bloque_nombre, rival, fecha_str):
     FORWARDS  = {"Pilar", "Hooker", "2° Linea", "3° Linea"}
     BACKS     = {"Medio scrum", "Apertura", "Centro", "Wing", "Fullback"}
 
@@ -190,11 +190,11 @@ def generar_placa(titulares_ids, suplentes_ids, bloque_nombre, rival, fecha_str)
 
         y_cursor += 10
 
-    # Clasificar titulares por puesto
+    # Clasificar convocados por puesto
     forwards   = []
     backs      = []
     sin_puesto = []
-    for i, jid in enumerate(titulares_ids):
+    for i, jid in enumerate(convocados_ids):
         puesto = st.session_state.plantel.get(str(jid), {}).get("puesto", "Sin Puesto")
         if puesto in FORWARDS:
             forwards.append((i + 1, jid))
@@ -209,8 +209,6 @@ def generar_placa(titulares_ids, suplentes_ids, bloque_nombre, rival, fecha_str)
         dibujar_seccion("Backs", backs)
     if sin_puesto:
         dibujar_seccion("Sin Puesto Asignado", sin_puesto)
-    if suplentes_ids:
-        dibujar_seccion("Suplentes", [(16 + i, jid) for i, jid in enumerate(suplentes_ids)])
 
     draw.line([(30, y_cursor + 4), (W - 30, y_cursor + 4)], fill=AMARILLO, width=1)
 
@@ -400,7 +398,7 @@ elif st.session_state.pantalla_actual == "Partidos":
     llave_partido = f"{fecha_p_str}_{bloque_corto}"
     st.write("---")
 
-    tab_conv, tab_stats, tab_placa = st.tabs(["📋 Convocatoria", "📊 Stats en Vivo", "🖼️ Generar Placa"])
+    tab_conv, tab_stats = st.tabs(["📋 Convocatoria", "📊 Stats en Vivo"])
 
     with tab_conv:
         if st.session_state.get("last_loaded_match") != llave_partido:
@@ -436,8 +434,8 @@ elif st.session_state.pantalla_actual == "Partidos":
             if st.session_state[clave]:
                 convocados_count += 1
         st.write(f"**Convocados: {convocados_count} jugadores**")
-        if st.button("💾 GUARDAR CONVOCATORIA", key="btn_guardar_conv"):
-            with st.spinner("Guardando..."):
+        if st.button("💾 GUARDAR CONVOCATORIA Y GENERAR PLACA", key="btn_guardar_conv"):
+            with st.spinner("Guardando y generando placa..."):
                 try:
                     filas_conv = [{"fecha": fecha_p_str, "bloque": bloque_corto,
                                    "jugador_id": str(id_),
@@ -445,6 +443,23 @@ elif st.session_state.pantalla_actual == "Partidos":
                                   for id_ in st.session_state.plantel.keys()]
                     supabase.table("convocados_partidos").upsert(filas_conv, on_conflict="fecha,bloque,jugador_id").execute()
                     st.success("¡Convocatoria guardada!")
+                    # Generar placa automáticamente
+                    ids_conv = [id_ for id_ in st.session_state.plantel.keys()
+                                if st.session_state.get(f"chk_p_{id_}_{llave_partido}", False)]
+                    if ids_conv and rival_seleccionado != "Seleccionar rival...":
+                        fecha_display = fecha_partido.strftime("%d/%m/%Y")
+                        placa_img = generar_placa(ids_conv, bloque_seleccionado, rival_seleccionado, fecha_display)
+                        buf = io.BytesIO()
+                        placa_img.save(buf, format="PNG")
+                        buf.seek(0)
+                        st.image(placa_img, use_container_width=True)
+                        st.download_button(
+                            label="📥 Descargar placa para WhatsApp",
+                            data=buf,
+                            file_name=f"placa_{bloque_corto}_{fecha_p_str}.png",
+                            mime="image/png",
+                            key="btn_download_placa"
+                        )
                 except Exception as e:
                     st.error(f"Error: {e}")
 
@@ -506,49 +521,6 @@ elif st.session_state.pantalla_actual == "Partidos":
                         except Exception as e:
                             st.error(f"Error: {e}")
 
-    with tab_placa:
-        st.subheader("🖼️ Generador de Placa de Convocatoria")
-        if rival_seleccionado == "Seleccionar rival...":
-            st.info("Seleccioná un rival arriba para generar la placa.")
-        else:
-            convocados_ids = [id_ for id_ in st.session_state.plantel.keys()
-                              if st.session_state.get(f"chk_p_{id_}_{llave_partido}", False)]
-            opciones_nombres = {id_: f"{datos['apellido']} {datos['nombre']}"
-                                for id_, datos in st.session_state.plantel.items()}
-            st.write("**Seleccioná los 15 titulares en orden (1 al 15):**")
-            titulares_sel = []
-            for i in range(1, 16):
-                default_id = convocados_ids[i-1] if i-1 < len(convocados_ids) else list(opciones_nombres.keys())[0]
-                default_nombre = opciones_nombres.get(default_id, "")
-                opciones_lista = list(opciones_nombres.values())
-                idx_default = opciones_lista.index(default_nombre) if default_nombre in opciones_lista else 0
-                sel = st.selectbox(f"#{i}", options=opciones_lista, index=idx_default, key=f"titular_sel_{i}")
-                sel_id = [id_ for id_, nombre in opciones_nombres.items() if nombre == sel][0]
-                titulares_sel.append(sel_id)
-            titulares_set = set(titulares_sel)
-            suplentes_sel = [id_ for id_ in convocados_ids if id_ not in titulares_set]
-            st.write("**Suplentes:**")
-            if suplentes_sel:
-                for id_ in suplentes_sel:
-                    st.write(f"• {opciones_nombres[id_]}")
-            else:
-                st.write("_Sin suplentes cargados_")
-            st.write("---")
-            if st.button("🖼️ GENERAR PLACA", key="btn_generar_placa"):
-                with st.spinner("Generando placa..."):
-                    fecha_display = fecha_partido.strftime("%d/%m/%Y")
-                    placa_img = generar_placa(titulares_sel, suplentes_sel, bloque_seleccionado, rival_seleccionado, fecha_display)
-                    buf = io.BytesIO()
-                    placa_img.save(buf, format="PNG")
-                    buf.seek(0)
-                    st.image(placa_img, use_container_width=True)
-                    st.download_button(
-                        label="📥 Descargar placa para WhatsApp",
-                        data=buf,
-                        file_name=f"placa_{bloque_corto}_{fecha_p_str}.png",
-                        mime="image/png",
-                        key="btn_download_placa"
-                    )
 
 # MÓDULO 4: ESTADÍSTICAS
 elif st.session_state.pantalla_actual == "Estadísticas":
