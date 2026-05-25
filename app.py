@@ -106,105 +106,115 @@ def crear_avatar(numero, size=150):
     return img
 
 def generar_placa(titulares_ids, suplentes_ids, bloque_nombre, rival, fecha_str):
-    W, H = 1100, 980
-    CELL_W, CELL_H = 200, 235
-    FOTO_SIZE = 148
+    FORWARDS  = {"Pilar", "Hooker", "2° Linea", "3° Linea"}
+    BACKS     = {"Medio scrum", "Apertura", "Centro", "Wing", "Fullback"}
 
-    img = Image.new("RGB", (W, H), color=(12, 12, 12))
+    W, H = 720, 1060
+    img  = Image.new("RGB", (W, H), color=(12, 12, 12))
     draw = ImageDraw.Draw(img)
 
     try:
-        font_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 30)
-        font_name  = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 19)
-        font_num   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 26)
-        font_sub   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 17)
-        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+        font_title   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 27)
+        font_sub     = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 15)
+        font_section = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 17)
+        font_jugador = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 21)
+        font_puesto  = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+        font_small   = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 13)
     except:
-        font_title = font_name = font_num = font_sub = font_small = ImageFont.load_default()
+        font_title = font_sub = font_section = font_jugador = font_puesto = font_small = ImageFont.load_default()
 
     AMARILLO = (244, 196, 48)
     AZUL     = (43, 62, 117)
     BLANCO   = (255, 255, 255)
-    GRIS     = (170, 170, 170)
+    GRIS     = (160, 160, 160)
+    GRIS_OSC = (38, 38, 38)
 
-    # Degradado superior
-    for y in range(85):
-        t = y / 85
-        r = int(12 + (43-12)*t)
-        g = int(12 + (62-12)*t)
-        b = int(12 + (117-12)*t)
+    # HEADER con degradado azul
+    HEADER_H = 225
+    for y in range(HEADER_H):
+        t = y / HEADER_H
+        r = int(43  + (12 - 43)  * t)
+        g = int(62  + (12 - 62)  * t)
+        b = int(117 + (12 - 117) * t)
         draw.line([(0, y), (W, y)], fill=(r, g, b))
 
-    # Título
+    # Escudo centrado
+    escudo_size = 118
+    escudo_y    = 16
+    try:
+        escudo = Image.open("escudo.png").convert("RGBA")
+        escudo = escudo.resize((escudo_size, escudo_size), Image.LANCZOS)
+        img.paste(escudo, ((W - escudo_size) // 2, escudo_y), escudo)
+    except:
+        cx, cy = W // 2, escudo_y + escudo_size // 2
+        draw.ellipse([cx-50, cy-50, cx+50, cy+50], fill=AZUL, outline=AMARILLO, width=3)
+        eb = draw.textbbox((0, 0), "TLTC", font=font_sub)
+        draw.text((cx - (eb[2]-eb[0])//2, cy - 10), "TLTC", fill=AMARILLO, font=font_sub)
+
     titulo = "TUCUMÁN LAWN TENNIS CLUB"
-    bb = draw.textbbox((0,0), titulo, font=font_title)
-    draw.text(((W-(bb[2]-bb[0]))//2, 15), titulo, fill=AMARILLO, font=font_title)
+    bb = draw.textbbox((0, 0), titulo, font=font_title)
+    draw.text(((W - (bb[2]-bb[0])) // 2, escudo_y + escudo_size + 6), titulo, fill=AMARILLO, font=font_title)
 
-    # Subtítulo
     sub = f"{bloque_nombre}  vs  {rival}  —  {fecha_str}"
-    bb2 = draw.textbbox((0,0), sub, font=font_small)
-    draw.text(((W-(bb2[2]-bb2[0]))//2, 52), sub, fill=GRIS, font=font_small)
+    bb2 = draw.textbbox((0, 0), sub, font=font_small)
+    draw.text(((W - (bb2[2]-bb2[0])) // 2, escudo_y + escudo_size + 40), sub, fill=GRIS, font=font_small)
 
-    draw.line([(30, 80), (W-30, 80)], fill=AMARILLO, width=2)
+    draw.line([(30, HEADER_H - 8), (W - 30, HEADER_H - 8)], fill=AMARILLO, width=2)
 
-    def dibujar_jugador(pos_x, pos_y, jugador_id, numero):
-        datos = st.session_state.plantel.get(str(jugador_id), {})
-        apellido = datos.get("apellido", "???").upper()
+    # Lista de jugadores
+    MARGEN_X  = 48
+    ROW_H     = 46
+    SECTION_H = 36
+    y_cursor  = HEADER_H + 10
 
-        foto_img = None
-        url = get_foto_url(str(jugador_id))
-        if url:
-            foto_img = cargar_imagen_desde_url(url)
-        foto_img = foto_img.resize((FOTO_SIZE, FOTO_SIZE)) if foto_img else crear_avatar(numero, FOTO_SIZE)
+    def dibujar_seccion(titulo_sec, jugadores):
+        nonlocal y_cursor
+        draw.rectangle([(MARGEN_X, y_cursor), (W - MARGEN_X, y_cursor + SECTION_H)], fill=AZUL)
+        draw.line([(MARGEN_X, y_cursor + SECTION_H), (W - MARGEN_X, y_cursor + SECTION_H)], fill=AMARILLO, width=1)
+        bb = draw.textbbox((0, 0), titulo_sec.upper(), font=font_section)
+        draw.text(((W - (bb[2]-bb[0])) // 2, y_cursor + 8), titulo_sec.upper(), fill=AMARILLO, font=font_section)
+        y_cursor += SECTION_H + 4
 
-        # Recorte circular
-        mask = Image.new("L", (FOTO_SIZE, FOTO_SIZE), 0)
-        ImageDraw.Draw(mask).ellipse([0, 0, FOTO_SIZE, FOTO_SIZE], fill=255)
-        foto_rgba = foto_img.convert("RGBA")
-        foto_rgba.putalpha(mask)
+        for i, (numero, jugador_id) in enumerate(jugadores):
+            datos    = st.session_state.plantel.get(str(jugador_id), {})
+            apellido = datos.get("apellido", "???").upper()
+            puesto   = datos.get("puesto", "")
+            fondo    = (22, 22, 22) if i % 2 == 0 else GRIS_OSC
+            draw.rectangle([(MARGEN_X, y_cursor), (W - MARGEN_X, y_cursor + ROW_H - 2)], fill=fondo)
+            num_str = str(numero)
+            draw.text((MARGEN_X + 12, y_cursor + 11), num_str, fill=AMARILLO, font=font_jugador)
+            draw.text((MARGEN_X + 52, y_cursor + 11), apellido, fill=BLANCO,  font=font_jugador)
+            pb = draw.textbbox((0, 0), puesto, font=font_puesto)
+            draw.text((W - MARGEN_X - (pb[2]-pb[0]) - 10, y_cursor + 15), puesto, fill=GRIS, font=font_puesto)
+            y_cursor += ROW_H
 
-        fx = pos_x + (CELL_W - FOTO_SIZE) // 2
-        img.paste(foto_rgba, (fx, pos_y + 8), foto_rgba)
-        draw.ellipse([fx-3, pos_y+5, fx+FOTO_SIZE+3, pos_y+FOTO_SIZE+11], outline=AMARILLO, width=3)
+        y_cursor += 10
 
-        # Número
-        nr = 17
-        ncx = fx + FOTO_SIZE - 4
-        ncy = pos_y + 11
-        draw.ellipse([ncx-nr, ncy-nr, ncx+nr, ncy+nr], fill=(8,8,8), outline=AMARILLO, width=2)
-        ns = str(numero)
-        nb = draw.textbbox((0,0), ns, font=font_num)
-        nw, nh = nb[2]-nb[0], nb[3]-nb[1]
-        draw.text((ncx-nw//2, ncy-nh//2-1), ns, fill=AMARILLO, font=font_num)
+    # Clasificar titulares por puesto
+    forwards   = []
+    backs      = []
+    sin_puesto = []
+    for i, jid in enumerate(titulares_ids):
+        puesto = st.session_state.plantel.get(str(jid), {}).get("puesto", "Sin Puesto")
+        if puesto in FORWARDS:
+            forwards.append((i + 1, jid))
+        elif puesto in BACKS:
+            backs.append((i + 1, jid))
+        else:
+            sin_puesto.append((i + 1, jid))
 
-        # Apellido
-        ab = draw.textbbox((0,0), apellido, font=font_name)
-        aw = ab[2]-ab[0]
-        draw.text((pos_x+(CELL_W-aw)//2, pos_y+FOTO_SIZE+16), apellido, fill=BLANCO, font=font_name)
-
-    filas = [titulares_ids[0:5], titulares_ids[5:10], titulares_ids[10:15]]
-    y_start = 92
-    for fi, fila in enumerate(filas):
-        x_offset = (W - len(fila)*CELL_W) // 2
-        for ci, jid in enumerate(fila):
-            dibujar_jugador(x_offset + ci*CELL_W, y_start + fi*CELL_H, jid, fi*5+ci+1)
-
-    y_sep = y_start + 3*CELL_H + 12
-    draw.line([(30, y_sep), (W-30, y_sep)], fill=AMARILLO, width=1)
-
+    if forwards:
+        dibujar_seccion("Forwards", forwards)
+    if backs:
+        dibujar_seccion("Backs", backs)
+    if sin_puesto:
+        dibujar_seccion("Sin Puesto Asignado", sin_puesto)
     if suplentes_ids:
-        partes = [f"{16+i} {st.session_state.plantel.get(str(jid),{}).get('apellido','???').upper()}"
-                  for i, jid in enumerate(suplentes_ids)]
-        texto = "   ".join(partes)
-        sb = draw.textbbox((0,0), texto, font=font_sub)
-        draw.text(((W-(sb[2]-sb[0]))//2, y_sep+12), texto, fill=AMARILLO, font=font_sub)
+        dibujar_seccion("Suplentes", [(16 + i, jid) for i, jid in enumerate(suplentes_ids)])
 
-    # Escudo placeholder
-    draw.ellipse([18, H-68, 76, H-10], fill=AZUL, outline=AMARILLO, width=2)
-    eb = draw.textbbox((0,0), "TLTC", font=font_small)
-    draw.text((47-(eb[2]-eb[0])//2, H-44), "TLTC", fill=AMARILLO, font=font_small)
+    draw.line([(30, y_cursor + 4), (W - 30, y_cursor + 4)], fill=AMARILLO, width=1)
 
-    return img
+    return img.crop((0, 0, W, min(y_cursor + 28, H)))
 
 # SEMILLA DEL PLANTEL
 if 'plantel' not in st.session_state:
