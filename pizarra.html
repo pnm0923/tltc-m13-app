@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a1a; font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 8px; }
+
+  #toolbar {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;
+    background: #2B3E75; border: 2px solid #F4C430; border-radius: 10px; padding: 8px 12px;
+    width: 100%; max-width: 780px; align-items: center; justify-content: center;
+  }
+  .tool-group { display: flex; gap: 4px; align-items: center; }
+  .sep { width: 1px; height: 28px; background: #F4C430; opacity: 0.4; margin: 0 4px; }
+  button {
+    background: #1e2d5a; color: #F4C430; border: 1.5px solid #F4C430;
+    border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px; font-weight: bold;
+    transition: all 0.15s;
+  }
+  button:hover, button.active { background: #F4C430; color: #1e2d5a; }
+  label { color: #ccc; font-size: 12px; }
+
+  #canvas-wrap {
+    position: relative; width: 100%; max-width: 780px;
+    border: 2px solid #F4C430; border-radius: 8px; overflow: hidden;
+  }
+  canvas { display: block; width: 100%; cursor: crosshair; touch-action: none; }
+
+  #info { color: #aaa; font-size: 11px; margin-top: 6px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div class="tool-group">
+    <label>Modo:</label>
+    <button id="btn-move"    class="active" onclick="setMode('move')">✋ Mover</button>
+    <button id="btn-solid"   onclick="setMode('solid')">→ Flecha</button>
+    <button id="btn-dashed"  onclick="setMode('dashed')">⤑ Punteada</button>
+    <button id="btn-erase"   onclick="setMode('erase')">🗑 Borrar flecha</button>
+  </div>
+  <div class="sep"></div>
+  <div class="tool-group">
+    <button onclick="resetPositions()">↺ Reset</button>
+    <button onclick="clearArrows()">✕ Borrar todo</button>
+    <button onclick="downloadImage()">📥 Guardar PNG</button>
+  </div>
+</div>
+
+<div id="canvas-wrap">
+  <canvas id="c"></canvas>
+</div>
+<div id="info">Modo Mover: arrastrá jugadores con el dedo · Modo Flecha: dibujá trayectorias</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+// Dimensiones lógicas del campo
+const CW = 780, CH = 480;
+canvas.width  = CW;
+canvas.height = CH;
+
+// ── COLORES ──────────────────────────────────────────────
+const COL = {
+  grass1: '#2d7a2d', grass2: '#267326',
+  line:   'rgba(255,255,255,0.7)',
+  own:    '#2B3E75', ownBorder: '#F4C430', ownText: '#F4C430',
+  rival:  '#888888', rivalBorder: '#cccccc', rivalText: '#fff',
+  ball:   '#e8b84b', ballBorder: '#c8943a',
+  arrowSolid:  '#F4C430',
+  arrowDashed: '#4FC3F7',
+};
+
+const R = 16; // radio jugador
+
+// ── POSICIONES INICIALES ──────────────────────────────────
+function defaultPositions() {
+  return {
+    own: [
+      {x:120,y:240, n:1},  // fullback
+      {x:160,y:160, n:2},  // wing
+      {x:200,y:240, n:3},  // centro
+      {x:200,y:300, n:4},  // centro
+      {x:160,y:320, n:5},  // wing
+      {x:280,y:200, n:6},  // flank
+      {x:300,y:260, n:7},  // flank
+      {x:300,y:300, n:8},  // nro8
+      {x:350,y:240, n:9},  // medio scrum
+      {x:400,y:220, n:10}, // apertura
+      {x:380,y:280, n:11}, // pilar
+      {x:390,y:310, n:12}, // hooker
+      {x:380,y:340, n:13}, // pilar
+      {x:400,y:370, n:14}, // 2da linea
+      {x:400,y:180, n:15}, // 2da linea
+    ],
+    rival: [
+      {x:620,y:240, n:1},
+      {x:580,y:160, n:2},
+      {x:540,y:240, n:3},
+      {x:540,y:300, n:4},
+      {x:580,y:320, n:5},
+      {x:460,y:200, n:6},
+      {x:460,y:260, n:7},
+      {x:460,y:300, n:8},
+      {x:410,y:240, n:9},
+      {x:420,y:200, n:10},
+      {x:440,y:160, n:11},
+      {x:440,y:280, n:12},
+      {x:440,y:320, n:13},
+      {x:440,y:360, n:14},
+      {x:440,y:120, n:15},
+    ],
+    ball: {x: 390, y: 240},
+  };
+}
+
+let state   = defaultPositions();
+let arrows  = [];   // {pts:[{x,y}...], dashed}
+let mode    = 'move';
+let dragging = null;    // {type:'own'|'rival'|'ball', idx}
+let drawing  = false;
+let currentArrow = null;
+
+// ── UTILS ─────────────────────────────────────────────────
+function scale() {
+  return canvas.getBoundingClientRect().width / CW;
+}
+function toCanvas(e) {
+  const r = canvas.getBoundingClientRect();
+  const s = scale();
+  const src = e.touches ? e.touches[0] : e;
+  return { x: (src.clientX - r.left) / s, y: (src.clientY - r.top) / s };
+}
+function dist(a, b) { return Math.hypot(a.x-b.x, a.y-b.y); }
+function hitPlayer(pt) {
+  for (let i = state.own.length-1; i >= 0; i--)
+    if (dist(pt, state.own[i]) < R+4) return {type:'own', idx:i};
+  for (let i = state.rival.length-1; i >= 0; i--)
+    if (dist(pt, state.rival[i]) < R+4) return {type:'rival', idx:i};
+  if (dist(pt, state.ball) < R+4) return {type:'ball', idx:0};
+  return null;
+}
+
+// ── DIBUJO DEL CAMPO ──────────────────────────────────────
+function drawField() {
+  // Rayas de pasto
+  for (let i = 0; i < 10; i++) {
+    ctx.fillStyle = i % 2 === 0 ? COL.grass1 : COL.grass2;
+    ctx.fillRect(i * CW/10, 0, CW/10, CH);
+  }
+  ctx.strokeStyle = COL.line;
+  ctx.lineWidth   = 1.5;
+
+  // In-goal areas
+  ctx.strokeRect(0, 0, 60, CH);
+  ctx.strokeRect(CW-60, 0, 60, CH);
+
+  // Líneas de 22m
+  ctx.beginPath(); ctx.moveTo(150,0); ctx.lineTo(150,CH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(CW-150,0); ctx.lineTo(CW-150,CH); ctx.stroke();
+
+  // Línea de medio campo
+  ctx.setLineDash([8,6]);
+  ctx.beginPath(); ctx.moveTo(CW/2,0); ctx.lineTo(CW/2,CH); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Líneas de 10m
+  ctx.lineWidth = 1;
+  [CW/2-80, CW/2+80].forEach(x => {
+    ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CH); ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Labels
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = 'bold 11px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('IN-GOAL', 30, 14);
+  ctx.fillText('IN-GOAL', CW-30, 14);
+  ctx.fillText('22m', 105, 14);
+  ctx.fillText('22m', CW-105, 14);
+}
+
+function drawArrow(pts, dashed, preview=false) {
+  if (pts.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = dashed ? COL.arrowDashed : COL.arrowSolid;
+  ctx.lineWidth   = 2.5;
+  ctx.globalAlpha = preview ? 0.6 : 1;
+  if (dashed) ctx.setLineDash([8, 5]);
+  else        ctx.setLineDash([]);
+
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.stroke();
+
+  // Cabeza de flecha
+  const last = pts[pts.length-1];
+  const prev = pts[pts.length-2];
+  const ang  = Math.atan2(last.y-prev.y, last.x-prev.x);
+  const hs   = 12;
+  ctx.setLineDash([]);
+  ctx.fillStyle = dashed ? COL.arrowDashed : COL.arrowSolid;
+  ctx.beginPath();
+  ctx.moveTo(last.x, last.y);
+  ctx.lineTo(last.x - hs*Math.cos(ang-0.4), last.y - hs*Math.sin(ang-0.4));
+  ctx.lineTo(last.x - hs*Math.cos(ang+0.4), last.y - hs*Math.sin(ang+0.4));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawPlayer(p, color, border, label, textColor='#fff') {
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, R, 0, Math.PI*2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.fillStyle = textColor;
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, p.x, p.y);
+}
+
+function drawBall(b) {
+  ctx.beginPath();
+  ctx.ellipse(b.x, b.y, 11, 8, 0, 0, Math.PI*2);
+  ctx.fillStyle = COL.ball;
+  ctx.fill();
+  ctx.strokeStyle = COL.ballBorder;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // costura
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(b.x-4, b.y); ctx.lineTo(b.x+4, b.y);
+  ctx.stroke();
+}
+
+function render() {
+  ctx.clearRect(0, 0, CW, CH);
+  drawField();
+
+  // Flechas guardadas
+  arrows.forEach(a => drawArrow(a.pts, a.dashed));
+
+  // Flecha en progreso
+  if (drawing && currentArrow && currentArrow.pts.length > 1)
+    drawArrow(currentArrow.pts, currentArrow.dashed, true);
+
+  // Jugadores rival
+  state.rival.forEach(p => drawPlayer(p, COL.rival, COL.rivalBorder, p.n));
+  // Jugadores propios
+  state.own.forEach(p => drawPlayer(p, COL.own, COL.ownBorder, p.n, COL.ownText));
+  // Pelota
+  drawBall(state.ball);
+}
+
+// ── INTERACCIÓN ───────────────────────────────────────────
+function pointerDown(e) {
+  e.preventDefault();
+  const pt = toCanvas(e);
+
+  if (mode === 'move') {
+    const hit = hitPlayer(pt);
+    if (hit) dragging = hit;
+
+  } else if (mode === 'solid' || mode === 'dashed') {
+    drawing = true;
+    currentArrow = { pts: [pt], dashed: mode === 'dashed' };
+
+  } else if (mode === 'erase') {
+    // Borrar la flecha más cercana al punto
+    let best = -1, bestD = 20;
+    arrows.forEach((a, ai) => {
+      a.pts.forEach(p => {
+        const d = dist(pt, p);
+        if (d < bestD) { bestD = d; best = ai; }
+      });
+    });
+    if (best >= 0) { arrows.splice(best, 1); render(); }
+  }
+}
+
+function pointerMove(e) {
+  e.preventDefault();
+  const pt = toCanvas(e);
+
+  if (mode === 'move' && dragging) {
+    if (dragging.type === 'own')   state.own[dragging.idx]   = {...state.own[dragging.idx],   x:pt.x, y:pt.y};
+    if (dragging.type === 'rival') state.rival[dragging.idx] = {...state.rival[dragging.idx], x:pt.x, y:pt.y};
+    if (dragging.type === 'ball')  state.ball = {x:pt.x, y:pt.y};
+    render();
+
+  } else if (drawing && currentArrow) {
+    const last = currentArrow.pts[currentArrow.pts.length-1];
+    if (dist(pt, last) > 6) currentArrow.pts.push(pt);
+    render();
+  }
+}
+
+function pointerUp(e) {
+  e.preventDefault();
+  if (mode === 'move') {
+    dragging = null;
+  } else if (drawing && currentArrow) {
+    if (currentArrow.pts.length > 2) arrows.push(currentArrow);
+    drawing = false;
+    currentArrow = null;
+    render();
+  }
+}
+
+canvas.addEventListener('mousedown',  pointerDown);
+canvas.addEventListener('mousemove',  pointerMove);
+canvas.addEventListener('mouseup',    pointerUp);
+canvas.addEventListener('touchstart', pointerDown, {passive:false});
+canvas.addEventListener('touchmove',  pointerMove, {passive:false});
+canvas.addEventListener('touchend',   pointerUp,   {passive:false});
+
+// ── CONTROLES ─────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  ['move','solid','dashed','erase'].forEach(id => {
+    const b = document.getElementById('btn-'+id);
+    if (b) b.classList.toggle('active', id === m);
+  });
+  canvas.style.cursor = m === 'move' ? 'grab' : 'crosshair';
+}
+
+function resetPositions() {
+  state = defaultPositions();
+  render();
+}
+
+function clearArrows() {
+  arrows = [];
+  render();
+}
+
+function downloadImage() {
+  const link = document.createElement('a');
+  link.download = 'jugada_tltc.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+render();
+</script>
+</body>
+</html>
