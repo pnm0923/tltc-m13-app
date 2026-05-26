@@ -354,6 +354,21 @@ elif st.session_state.pantalla_actual == "Plantel":
                     st.session_state.plantel[id_]["puesto"] = nuevo_puesto
                     st.session_state.plantel[id_]["notas_actitud"] = nota_act
                     st.session_state.plantel[id_]["notas_tecnicas"] = nota_tec
+
+                # Estadistica de asistencia
+                st.write("---")
+                try:
+                    res_asist = supabase.table("asistencias_entrenamiento").select("presente").eq("jugador_id", str(id_)).execute()
+                    total     = len(res_asist.data)
+                    presentes = sum(1 for r in res_asist.data if r["presente"])
+                    ausentes  = total - presentes
+                    porcentaje = int((presentes / total) * 100) if total > 0 else 0
+                    col_p, col_a, col_pct = st.columns(3)
+                    col_p.markdown(f"<span style=\'color:#4CAF50; font-weight:bold; font-size:15px\'>Entrenamiento: {presentes} presentes</span>", unsafe_allow_html=True)
+                    col_a.markdown(f"<span style=\'color:#F44336; font-weight:bold; font-size:15px\'>{ausentes} ausentes</span>", unsafe_allow_html=True)
+                    col_pct.markdown(f"<span style=\'color:#F4C430; font-weight:bold; font-size:15px\'>{porcentaje}%</span>", unsafe_allow_html=True)
+                except Exception as e_asist:
+                    st.caption(f"No se pudo cargar asistencia: {e_asist}")
     st.write("---")
     if st.button("💾 GUARDAR MODIFICACIONES DEL PLANTEL", key="btn_guardar_fichas_nube"):
         with st.spinner("Sincronizando puestos y notas con la nube..."):
