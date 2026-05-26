@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import datetime
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -266,6 +267,10 @@ if st.session_state.pantalla_actual == "Inicio":
         st.markdown('<div class="menu-card"><h4>📊 Estadísticas</h4><p>Ver evolución del jugador</p></div>', unsafe_allow_html=True)
         if st.button("Ir a Estadísticas", key="btn_stats"):
             st.session_state.pantalla_actual = "Estadísticas"; st.rerun()
+
+    st.write("")
+    if st.button("🎯 Ir a Pizarra Táctica", key="btn_pizarra"):
+        st.session_state.pantalla_actual = "Pizarra"; st.rerun()
 
 # MÓDULO 1: ASISTENCIA
 elif st.session_state.pantalla_actual == "Asistencia":
@@ -555,6 +560,20 @@ elif st.session_state.pantalla_actual == "Partidos":
                         except Exception as e:
                             st.error(f"Error: {e}")
 
+
+
+# MÓDULO 5: PIZARRA TÁCTICA
+elif st.session_state.pantalla_actual == "Pizarra":
+    if st.button("⬅️ Volver al Menú Principal", key="back_pizarra"):
+        st.session_state.pantalla_actual = "Inicio"; st.rerun()
+    st.header("🎯 Pizarra Táctica")
+    st.caption("Mover: arrastrá jugadores · Flecha/Punteada: dibujá trayectorias · Guardá como PNG")
+    try:
+        with open("pizarra.html", "r", encoding="utf-8") as f_piz:
+            pizarra_html = f_piz.read()
+        components.html(pizarra_html, height=580, scrolling=False)
+    except Exception as e:
+        st.error(f"No se pudo cargar la pizarra: {e}")
 
 # MÓDULO 4: ESTADÍSTICAS
 elif st.session_state.pantalla_actual == "Estadísticas":
