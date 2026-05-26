@@ -378,7 +378,7 @@ elif st.session_state.pantalla_actual == "Partidos":
     col_p1, col_p2 = st.columns(2)
     with col_p1:
         bloque_seleccionado = st.selectbox("Bloque TLTC",
-            ["Tucumán Lawn Tennis Azul", "Tucumán Lawn Tennis Amarillo"], key="sb_bloque")
+            ["Tucuman Lawn Tennis Azul", "Tucuman Lawn Tennis Amarillo"], key="sb_bloque")
     with col_p2:
         rival_seleccionado = st.selectbox("Rival", lista_rivales, key="sb_rival")
     fecha_partido = st.date_input("Fecha del Partido", datetime.date.today(), key="di_fecha_partido")
