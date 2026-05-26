@@ -206,17 +206,17 @@ def generar_placa(convocados_ids, bloque_nombre, rival, fecha_str):
 # SEMILLA DEL PLANTEL
 if 'plantel' not in st.session_state:
     nombres_crudos = [
-        "ARGAÑARAZ BAUTISTA", "BANEGAS MAXIMO", "BELLIDO IVO", "BERTINI ANTONIO", "BERTINI DIEGO",
+        "ARGANARAZ BAUTISTA", "BANEGAS MAXIMO", "BELLIDO IVO", "BERTINI ANTONIO", "BERTINI DIEGO",
         "BUENO RISCO LISANDRO", "CANO PAOLETTI SALVADOR", "CARRASCO IGNACIO", "CISNEROS POSSE MAXIMO",
         "CORONEL BLAS", "CORONEL STEFANO", "CORROTO RODRIGO", "CRIPOVICH JUAN IGNACIO", "CRUZADO BAUTISTA",
-        "DEL TOSO BENJAMÍN", "FERNANDEZ CORREA JUAN MARTIN", "FERNANDEZ FELIPE IGNACIO", "GARCIA COLLADOS MAXIMO",
+        "DEL TOSO BENJAMIN", "FERNANDEZ CORREA JUAN MARTIN", "FERNANDEZ FELIPE IGNACIO", "GARCIA COLLADOS MAXIMO",
         "GIBILISCO MATEO", "GIJON BENJAMIN", "GUARDIA GERONIMO", "HERRERA BENJAMIN", "INGARAMO BAUTISTA",
         "JUAREZ COLLADO LUCAS", "LIZARRAGA PALACIOS BAUTISTA", "LOBO HERRERA VICENTE", "MAIZEL FACUNDO",
         "MARIGLIANO LORENZO", "MARQUESTO MARTIN", "MEJAIL FRANCISCO", "MOLINA FRANCISCO", "MOROF MAXIMILANO",
         "NELLA CASTRO ANTONIO", "NORES PONDAL LORENZO", "ORTIZ FELIPE", "PALAVECINO JOAQUIN", "PEIRO JUAN PABLO",
         "PEREZ FELIPE IGNACIO", "PEZZA ARQUEZ SOLANO", "PONCE DIAZ ELISEO", "PONCE MATEO", "RAIDEN RECUPERO BIEL",
         "RODRIGUEZ BELMONTE FRANCISCO", "RUIZ MENDILARZU MANUEL", "SALAZAR BENICIO", "SASSI BERNARDO",
-        "SILVA SANTIAGO", "SOLBES FACUNDO", "SOSA LORENZO", "SOUBIE PEDRO", "TOMÁS FELIPE", "VALLE PADUA FELIPE",
+        "SILVA SANTIAGO", "SOLBES FACUNDO", "SOSA LORENZO", "SOUBIE PEDRO", "TOMAS FELIPE", "VALLE PADUA FELIPE",
         "VELAZQUEZ FELIPE", "VIOLETTO OCTAVIO", "VIOTTI JUAN MARTIN"
     ]
     st.session_state.plantel = {
@@ -372,9 +372,9 @@ elif st.session_state.pantalla_actual == "Partidos":
     if st.button("⬅️ Volver al Menú Principal", key="back_partidos"):
         st.session_state.pantalla_actual = "Inicio"; st.rerun()
     st.header("🏉 Partidos y Estadísticas en Vivo")
-    lista_rivales = ["Seleccionar rival...", "Tucumán Rugby", "Universitario", "Jockey Club",
-        "Cardenales", "Natación y Gimnasia", "Los Tarcos", "Lince",
-        "Huirapuca", "Aguará Guazú", "San Martín/Liceo/Corsarios"]
+    lista_rivales = ["Seleccionar rival...", "Tucuman Rugby", "Universitario", "Jockey Club",
+        "Cardenales", "Natacion y Gimnasia", "Los Tarcos", "Lince",
+        "Huirapuca", "Aguara Guazu", "San Martin/Liceo/Corsarios"]
     col_p1, col_p2 = st.columns(2)
     with col_p1:
         bloque_seleccionado = st.selectbox("Bloque TLTC",
