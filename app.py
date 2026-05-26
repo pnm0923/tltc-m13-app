@@ -415,28 +415,58 @@ elif st.session_state.pantalla_actual == "Partidos":
                 for id_ in st.session_state.plantel.keys():
                     st.session_state[f"chk_p_{id_}_{llave_partido}"] = False
             st.session_state.last_loaded_match = llave_partido
+
         col_c1, col_c2 = st.columns(2)
         with col_c1:
-            if st.button("✔️ Convocar a Todos", key="btn_conv_todos"):
+            if st.button("Convocar a Todos", key="btn_conv_todos"):
                 for id_ in st.session_state.plantel.keys():
                     st.session_state[f"chk_p_{id_}_{llave_partido}"] = True
                 st.rerun()
         with col_c2:
-            if st.button("❌ Limpiar Convocatoria", key="btn_conv_limpiar"):
+            if st.button("Limpiar Convocatoria", key="btn_conv_limpiar"):
                 for id_ in st.session_state.plantel.keys():
                     st.session_state[f"chk_p_{id_}_{llave_partido}"] = False
                 st.rerun()
-        buscar_conv = st.text_input("🔍 Buscar jugador...")
-        convocados_count = 0
+
+        # Clasificar jugadores por sección
+        FORWARDS_P = {"Pilar", "Hooker", "2° Linea", "3° Linea"}
+        BACKS_P    = {"Medio scrum", "Apertura", "Centro", "Wing", "Fullback"}
+        forwards_list, backs_list, sinpuesto_list = [], [], []
         for id_, datos in st.session_state.plantel.items():
-            nombre_completo = f"{datos['apellido']} {datos['nombre']}"
+            puesto = datos.get("puesto", "Sin Puesto")
+            if puesto in FORWARDS_P:
+                forwards_list.append((id_, datos))
+            elif puesto in BACKS_P:
+                backs_list.append((id_, datos))
+            else:
+                sinpuesto_list.append((id_, datos))
+
+        # Inicializar claves faltantes
+        for id_ in st.session_state.plantel.keys():
             clave = f"chk_p_{id_}_{llave_partido}"
             if clave not in st.session_state:
                 st.session_state[clave] = False
-            if buscar_conv.lower() in nombre_completo.lower():
-                st.checkbox(nombre_completo, key=clave)
-            if st.session_state[clave]:
-                convocados_count += 1
+
+        def seccion_convocatoria(titulo, jugadores):
+            convocados_sec = sum(1 for id_, _ in jugadores if st.session_state.get(f"chk_p_{id_}_{llave_partido}", False))
+            with st.expander(f"{titulo} ({convocados_sec}/{len(jugadores)} convocados)", expanded=False):
+                for id_, datos in jugadores:
+                    nombre_completo = f"{datos['apellido']} {datos['nombre']}"
+                    puesto = datos.get("puesto", "Sin Puesto")
+                    clave = f"chk_p_{id_}_{llave_partido}"
+                    col_chk, col_pst = st.columns([3, 1])
+                    with col_chk:
+                        st.checkbox(nombre_completo, key=clave)
+                    with col_pst:
+                        st.caption(puesto)
+
+        seccion_convocatoria("Forwards", forwards_list)
+        seccion_convocatoria("Backs", backs_list)
+        if sinpuesto_list:
+            seccion_convocatoria("Sin Puesto Asignado", sinpuesto_list)
+
+        convocados_count = sum(1 for id_ in st.session_state.plantel.keys()
+                               if st.session_state.get(f"chk_p_{id_}_{llave_partido}", False))
         st.write(f"**Convocados: {convocados_count} jugadores**")
         if st.button("💾 GUARDAR CONVOCATORIA Y GENERAR PLACA", key="btn_guardar_conv"):
             with st.spinner("Guardando y generando placa..."):
